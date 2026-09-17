@@ -3,44 +3,41 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>運用画面（デモ） | zod-jev</title>
+    <title>判定の裏側 | zod-jev</title>
     <link rel="stylesheet" href="/style.css" />
   </head>
-  <body class="wide">
-    <header>
-      <p class="brand">運用画面（デモ）</p>
-      <h1>レビュー投稿の裏側</h1>
+  <body class="ops wide">
+    <main class="page">
+      <h1>出品判定の裏側</h1>
       <p class="lead">
-        このページは運用者向けで、利用者には見えません。フォームが送信されるたびに、Zod が
+        開発者向けのページです。利用者には見えません。出品ボタンが押されるたびに、Zod が
         <strong>形</strong>を、TypeSafe JEV が<strong>意味</strong>を判定し、その結果を
-        「掲載待ち / 審査中 / 差し戻し」という普通のプロダクト状態に写像しています。
+        「公開中 / 審査中 / 出品不可」という普通のプロダクト状態に写像しています。
       </p>
       <div class="ops-head">
         <span class="mode-pill" id="mode-pill">mode=…</span>
         <span class="mode-pill" id="api-pill">…</span>
       </div>
-    </header>
 
-    <main>
       <section class="card">
         <h2>判定に使っている条件（JEV へは 1 リクエストでまとめて送信）</h2>
         <div id="rules"></div>
       </section>
 
       <section class="card">
-        <h2>デモ用: 投稿を流す</h2>
-        <p class="note">利用者向けフォームと同じ経路（<code>POST /api/reviews</code>）で送ります。</p>
+        <h2>デモ用: 出品を流す</h2>
+        <p class="muted">利用者向けの出品フォームと同じ経路（<code>POST /api/listings</code>）で送ります。</p>
         <div id="samples" class="chips"></div>
       </section>
 
       <section class="card">
-        <h2>受け付けた投稿 <span class="mode-pill" id="count">0 件</span></h2>
-        <p class="note">3 秒ごとに自動更新します。行を開くと、判定に使った条件と送信内容が見えます。</p>
+        <h2>受け付けた出品 <span class="mode-pill" id="count">0 件</span></h2>
+        <p class="muted">3 秒ごとに自動更新します。行を開くと、条件ごとの確率と送信内容が見えます。</p>
         <div id="list"></div>
       </section>
-    </main>
 
-    <footer><a href="/">利用者向けフォームへ</a></footer>
+      <p class="muted"><a href="/">出品画面へ</a></p>
+    </main>
 
     <script src="/ops.js" type="module"></script>
   </body>

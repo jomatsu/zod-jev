@@ -1,26 +1,32 @@
 /**
- * Cloudflare Workers 版のデモ。
+ * Cloudflare Workers 版のデモ（https://zod-jev.jomatsu.me/）。
  *
- * examples/web の review.ts をそのまま使い、判定をサーバー側（Workers）で実行します。
+ * examples/web の listing.ts をそのまま使い、判定をサーバー側（Workers）で実行します。
  *
  *   npx wrangler deploy --config examples/web/wrangler.jsonc
  *   npx wrangler secret put TYPESAFE_API_KEY --config examples/web/wrangler.jsonc
  *
  * - API キーは Secret に置く。ブラウザには渡らない
  * - 静的ファイルは Workers Assets から配信し、`/ops` だけ ops.html にマップする
- * - 受け付けた投稿は Durable Object（ReviewStore）に永続化する。
+ * - 出品の記録は Durable Object（ListingStore）に永続化する。
  *   Workers は isolate が複数あるので、モジュールスコープのメモリでは
  *   リクエストごとに別の記録を見てしまう（実測でそうなった）ため。
  */
 import { DEFAULT_THRESHOLD } from "../../src/index.js";
 import { fakeFetch, samples } from "./fake.js";
 import {
-  createReviewService,
-  ReviewRules,
-  type ReviewMode,
-  type Submission,
-  type SubmissionStore,
-} from "./review.js";
+  CATEGORIES,
+  CONDITIONS,
+  createListingService,
+  FEE_RATE,
+  ListingRules,
+  SHIPPING_DAYS,
+  SHIPPING_FEES,
+  type ListingMode,
+  type ListingRecord,
+  // Durable Object のクラス名（ListingStore）と衝突するので別名で取り込む
+  type ListingStore as ListingStorePort,
+} from "./listing.js";
 
 /** Durable Object のストレージ（構造だけ要求して、型定義パッケージに依存しない）。 */
 interface DurableObjectStateLike {
@@ -35,9 +41,9 @@ export interface Env {
   readonly ASSETS: { fetch(input: Request | URL | string): Promise<Response> };
   /**
    * Durable Object の**名前空間**バインディング。
-   * スタブ（実際のインスタンス）は `get(idFromName("reviews"))` で取る。
+   * スタブ（実際のインスタンス）は `get(idFromName("listings"))` で取る。
    */
-  readonly REVIEW_STORE: {
+  readonly LISTING_STORE: {
     idFromName(name: string): unknown;
     get(id: unknown): { fetch(input: Request | string, init?: RequestInit): Promise<Response> };
   };
@@ -50,7 +56,7 @@ export interface Env {
 }
 
 const ENDPOINT = "https://api.typesafe.ai/v1/systemone";
-const STORAGE_KEY = "submissions";
+const STORAGE_KEY = "listings";
 const STORE_LIMIT = 100;
 
 const json = (payload: unknown, status = 200): Response =>
@@ -60,29 +66,29 @@ const json = (payload: unknown, status = 200): Response =>
   });
 
 /** 記録を集約する単一の Durable Object スタブ（名前で固定する）。 */
-const storeStub = (env: Env) => env.REVIEW_STORE.get(env.REVIEW_STORE.idFromName("reviews"));
+const storeStub = (env: Env) => env.LISTING_STORE.get(env.LISTING_STORE.idFromName("listings"));
 
 /** Durable Object を保存先として使うアダプタ。 */
-const durableStore = (env: Env): SubmissionStore => ({
-  async add(submission: Submission): Promise<void> {
-    await storeStub(env).fetch("https://review-store/add", {
+const durableStore = (env: Env): ListingStorePort => ({
+  async add(record: ListingRecord): Promise<void> {
+    await storeStub(env).fetch("https://listing-store/add", {
       method: "POST",
-      body: JSON.stringify(submission),
+      body: JSON.stringify(record),
     });
   },
-  async list(): Promise<readonly Submission[]> {
-    const response = await storeStub(env).fetch("https://review-store/list");
-    const body = (await response.json()) as { submissions: Submission[] };
-    return body.submissions;
+  async list(): Promise<readonly ListingRecord[]> {
+    const response = await storeStub(env).fetch("https://listing-store/list");
+    const body = (await response.json()) as { records: ListingRecord[] };
+    return body.records;
   },
 });
 
 let cached:
-  | { readonly key: string; readonly service: ReturnType<typeof createReviewService> }
+  | { readonly key: string; readonly service: ReturnType<typeof createListingService> }
   | undefined;
 
 function getService(env: Env) {
-  const mode: ReviewMode =
+  const mode: ListingMode =
     env.REVIEW_MODE === "off" || env.REVIEW_MODE === "shadow" ? env.REVIEW_MODE : "enforce";
   const fake = env.FAKE_JEV === "1" || env.FAKE_JEV === "true";
   const key = `${mode}:${fake}:${env.TYPESAFE_API_KEY === undefined ? "no-key" : "key"}`;
@@ -90,7 +96,7 @@ function getService(env: Env) {
   if (cached === undefined || cached.key !== key) {
     cached = {
       key,
-      service: createReviewService({
+      service: createListingService({
         mode,
         store: durableStore(env),
         ...(fake ? { apiKey: "fake-key", fetch: fakeFetch() } : { apiKey: env.TYPESAFE_API_KEY }),
@@ -112,7 +118,14 @@ export default {
           fake,
           endpoint: ENDPOINT,
           defaultThreshold: DEFAULT_THRESHOLD,
-          rules: ReviewRules.map((rule) => ({
+          feeRate: FEE_RATE,
+          options: {
+            categories: CATEGORIES,
+            conditions: CONDITIONS,
+            shippingFees: SHIPPING_FEES,
+            shippingDays: SHIPPING_DAYS,
+          },
+          rules: ListingRules.map((rule) => ({
             id: rule.id,
             is: rule.is,
             message: rule.message,
@@ -122,19 +135,19 @@ export default {
         });
       }
 
-      if (url.pathname === "/api/reviews" && request.method === "POST") {
+      if (url.pathname === "/api/listings" && request.method === "POST") {
         const { service } = getService(env);
         const input = await request.json().catch(() => null);
         const result = await service.submit(input);
         return json(result, result.ok ? 201 : 422);
       }
 
-      if (url.pathname === "/api/reviews" && request.method === "GET") {
+      if (url.pathname === "/api/listings" && request.method === "GET") {
         const { service } = getService(env);
-        return json({ submissions: await service.list() });
+        return json({ records: await service.list() });
       }
 
-      if (url.pathname === "/api/reviews") {
+      if (url.pathname === "/api/listings") {
         return json({ error: "method not allowed" }, 405);
       }
 
@@ -162,10 +175,10 @@ export default {
 };
 
 /**
- * 受け付けた投稿を保存する Durable Object。
+ * 出品の記録を保存する Durable Object。
  * 単一インスタンスなので read-modify-write が直列になり、isolate をまたいでも記録が揃う。
  */
-export class ReviewStore {
+export class ListingStore {
   readonly #state: DurableObjectStateLike;
 
   constructor(state: DurableObjectStateLike) {
@@ -174,18 +187,18 @@ export class ReviewStore {
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
-    const submissions = (await this.#state.storage.get<Submission[]>(STORAGE_KEY)) ?? [];
+    const records = (await this.#state.storage.get<ListingRecord[]>(STORAGE_KEY)) ?? [];
 
     if (request.method === "POST" && url.pathname === "/add") {
-      const submission = (await request.json()) as Submission;
-      submissions.unshift(submission);
-      if (submissions.length > STORE_LIMIT) submissions.length = STORE_LIMIT;
-      await this.#state.storage.put(STORAGE_KEY, submissions);
+      const record = (await request.json()) as ListingRecord;
+      records.unshift(record);
+      if (records.length > STORE_LIMIT) records.length = STORE_LIMIT;
+      await this.#state.storage.put(STORAGE_KEY, records);
       return json({ ok: true });
     }
 
     if (url.pathname === "/list") {
-      return json({ submissions });
+      return json({ records });
     }
 
     return json({ error: "not found" }, 404);

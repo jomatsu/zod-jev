@@ -1,15 +1,16 @@
 /**
- * デモ web アプリの HTTP 層。
+ * デモ web アプリの HTTP 層（ローカル実行用）。
  *
  *   npx tsx examples/web/server.ts                  # 実 API（TYPESAFE_API_KEY / .env）
  *   npx tsx examples/web/server.ts --fake           # 偽の JEV（鍵不要・課金なし）
  *   npx tsx examples/web/server.ts --mode=shadow    # 判定はするが挙動は変えない（観測）
  *   npx tsx examples/web/server.ts --mode=off       # JEV を呼ばない（キルスイッチ）
  *
- *   /      利用者向け: 普通のレビュー投稿フォーム（JEV の存在は見せない）
- *   /ops   運用者向け: 裏で何を判定したか（確率・送信内容・トークン）
+ *   /      利用者向け: フリマアプリの出品画面（JEV の存在は見せない）
+ *   /ops   開発者向け: 裏で何を判定したか（確率・送信内容・トークン）
  *
  * API キーはこのプロセスにだけ置きます。ブラウザには渡しません。
+ * Cloudflare Workers 版は worker.ts / wrangler.jsonc。
  */
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
@@ -17,14 +18,23 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { fileURLToPath } from "node:url";
 import { DEFAULT_THRESHOLD } from "../../src/index.js";
 import { fakeFetch, samples } from "./fake.js";
-import { createReviewService, ReviewRules, type ReviewMode } from "./review.js";
+import {
+  CATEGORIES,
+  CONDITIONS,
+  createListingService,
+  FEE_RATE,
+  ListingRules,
+  SHIPPING_DAYS,
+  SHIPPING_FEES,
+  type ListingMode,
+} from "./listing.js";
 
 if (existsSync(".env")) process.loadEnvFile(".env");
 
 const args = process.argv.slice(2);
 const fake = args.includes("--fake");
 const modeArg = args.find((arg) => arg.startsWith("--mode="))?.slice("--mode=".length);
-const mode: ReviewMode = modeArg === "off" || modeArg === "shadow" ? modeArg : "enforce";
+const mode: ListingMode = modeArg === "off" || modeArg === "shadow" ? modeArg : "enforce";
 const port = Number(process.env.PORT ?? 5178);
 const apiKey = process.env.TYPESAFE_API_KEY;
 
@@ -34,7 +44,7 @@ if (!fake && mode !== "off" && (apiKey === undefined || apiKey === "")) {
   process.exit(1);
 }
 
-const service = createReviewService({
+const service = createListingService({
   mode,
   ...(fake ? { apiKey: "fake-key", fetch: fakeFetch() } : { apiKey }),
 });
@@ -43,6 +53,8 @@ const contentTypes: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
   ".css": "text/css; charset=utf-8",
+  ".jpg": "image/jpeg",
+  ".png": "image/png",
 };
 
 const server = createServer((request, response) => {
@@ -55,15 +67,15 @@ const server = createServer((request, response) => {
 async function handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
   const url = new URL(request.url ?? "/", `http://localhost:${port}`);
 
-  if (request.method === "POST" && url.pathname === "/api/reviews") {
+  if (request.method === "POST" && url.pathname === "/api/listings") {
     const input = await readJson(request);
     const result = await service.submit(input);
-    // 差し戻しは 422（普通のフォームのバリデーションエラーとして返す）
+    // 出品できない場合は 422（フォームのバリデーションエラーとして返す）
     return sendJson(response, result.ok ? 201 : 422, result);
   }
 
-  if (request.method === "GET" && url.pathname === "/api/reviews") {
-    return sendJson(response, 200, { submissions: await service.list() });
+  if (request.method === "GET" && url.pathname === "/api/listings") {
+    return sendJson(response, 200, { records: await service.list() });
   }
 
   if (request.method === "GET" && url.pathname === "/api/meta") {
@@ -72,7 +84,14 @@ async function handle(request: IncomingMessage, response: ServerResponse): Promi
       fake,
       endpoint: "https://api.typesafe.ai/v1/systemone",
       defaultThreshold: DEFAULT_THRESHOLD,
-      rules: ReviewRules.map((rule) => ({
+      feeRate: FEE_RATE,
+      options: {
+        categories: CATEGORIES,
+        conditions: CONDITIONS,
+        shippingFees: SHIPPING_FEES,
+        shippingDays: SHIPPING_DAYS,
+      },
+      rules: ListingRules.map((rule) => ({
         id: rule.id,
         is: rule.is,
         message: rule.message,
@@ -127,7 +146,7 @@ function sendJson(response: ServerResponse, status: number, payload: unknown): v
 }
 
 server.listen(port, () => {
-  console.log(`利用者向けフォーム: http://localhost:${port}/`);
-  console.log(`運用画面（裏側）:   http://localhost:${port}/ops`);
+  console.log(`出品画面（利用者向け）: http://localhost:${port}/`);
+  console.log(`裏側（開発者向け）:     http://localhost:${port}/ops`);
   console.log(`  mode=${mode}${fake ? " / --fake（偽の判定・課金なし）" : " / 実 API"}`);
 });

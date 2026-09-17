@@ -3,77 +3,163 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>商品レビューを書く | Example Store</title>
+    <title>出品 | フリマ</title>
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
-    <header>
-      <p class="brand">Example Store</p>
-      <h1>商品レビューを書く</h1>
-      <p class="lead">
-        「コンパクト収納デスク」をご購入いただきありがとうございます。今後の参考のため、ご感想をお聞かせください。
-      </p>
+    <header class="global-header">
+      <div class="inner">
+        <span class="wordmark">フリマ</span>
+        <input class="global-search" type="text" placeholder="キーワードから探す" disabled />
+        <nav class="global-nav">
+          <span>いいね！</span>
+          <span>お知らせ</span>
+          <span>マイページ</span>
+          <span class="avatar"></span>
+        </nav>
+      </div>
     </header>
 
-    <main class="card">
-      <div id="alert" class="alert" hidden></div>
-
-      <form id="form" novalidate>
-        <div class="field">
-          <label for="nickname">ニックネーム<span class="req">必須</span></label>
-          <input id="nickname" name="nickname" type="text" maxlength="20" autocomplete="nickname" />
-          <p class="field-error" id="err-nickname"></p>
-        </div>
-
-        <fieldset class="field">
-          <legend>評価<span class="req">必須</span></legend>
-          <div class="stars">
-            <label><input type="radio" name="rating" value="5" /> ★★★★★</label>
-            <label><input type="radio" name="rating" value="4" /> ★★★★</label>
-            <label><input type="radio" name="rating" value="3" /> ★★★</label>
-            <label><input type="radio" name="rating" value="2" /> ★★</label>
-            <label><input type="radio" name="rating" value="1" /> ★</label>
+    <main class="page">
+      <div class="columns">
+        <section class="card form-card">
+          <div class="form-head">
+            <h1>出品</h1>
+            <div class="draft">
+              <span id="draft-note">前回の下書きを復元しました</span>
+              <a href="#" id="draft-restore">下書きを復元</a>
+              <a href="#" id="draft-clear">クリア</a>
+            </div>
           </div>
-          <p class="field-error" id="err-rating"></p>
-        </fieldset>
 
-        <div class="field">
-          <label for="title">タイトル<span class="req">必須</span></label>
-          <input id="title" name="title" type="text" maxlength="60" />
-          <p class="field-error" id="err-title"></p>
-        </div>
+          <div id="banner" class="error-banner" hidden></div>
 
-        <div class="field">
-          <label for="body">レビュー本文<span class="req">必須</span></label>
-          <textarea id="body" name="body" rows="6" maxlength="2000"></textarea>
-          <p class="hint">10文字以上。使った場面や、良かった点・気になった点をご記入ください。</p>
-          <p class="field-error" id="err-body"></p>
-        </div>
+          <form id="form" novalidate>
+            <div class="row">
+              <div class="label">出品画像<span class="req">必須</span></div>
+              <div class="control">
+                <div class="photos" id="photos">
+                  <div class="photo filled" id="photo-1">
+                    <img src="/sample-camera.jpg" alt="出品画像" />
+                  </div>
+                  <div class="photo add" id="photo-2">＋</div>
+                  <div class="photo">＋</div>
+                  <div class="photo">＋</div>
+                </div>
+                <p class="hint">最大10枚までアップロードできます（あと6枚追加できます）</p>
+              </div>
+            </div>
 
-        <div class="field">
-          <label for="email">メールアドレス<span class="opt">任意</span></label>
-          <input id="email" name="email" type="email" autocomplete="email" />
-          <p class="hint">掲載内容について確認が必要な場合のみご連絡します。</p>
-          <p class="field-error" id="err-email"></p>
-        </div>
+            <div class="row">
+              <div class="label">商品名<span class="req">必須</span></div>
+              <div class="control">
+                <input id="title" name="title" type="text" maxlength="40" />
+                <p class="field-error" id="err-title"></p>
+              </div>
+            </div>
 
-        <button id="submit" class="primary" type="submit">レビューを投稿する</button>
-      </form>
+            <div class="row">
+              <div class="label">商品の説明<span class="req">必須</span></div>
+              <div class="control">
+                <textarea id="body" name="body" maxlength="1000"></textarea>
+                <p class="counter"><span id="body-count">0</span>/1000</p>
+                <p class="field-error" id="err-body"></p>
+              </div>
+            </div>
 
-      <section id="done" class="done" hidden>
-        <div class="mark">✓</div>
-        <h2>レビューを投稿しました</h2>
-        <p class="muted">
-          投稿ID: <span class="receipt" id="receipt-id"></span><br />
-          <span id="receipt-note">内容を確認のうえ、順次掲載します。</span>
-        </p>
-      </section>
+            <div class="row">
+              <div class="label">カテゴリー<span class="req">必須</span></div>
+              <div class="control">
+                <select id="category" name="category"></select>
+                <p class="field-error" id="err-category"></p>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="label">商品の状態<span class="req">必須</span></div>
+              <div class="control">
+                <select id="condition" name="condition"></select>
+                <p class="field-error" id="err-condition"></p>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="label">配送料の負担<span class="req">必須</span></div>
+              <div class="control">
+                <select id="shippingFee" name="shippingFee"></select>
+                <p class="field-error" id="err-shippingFee"></p>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="label">発送までの日数<span class="req">必須</span></div>
+              <div class="control">
+                <select id="shippingDays" name="shippingDays"></select>
+                <p class="field-error" id="err-shippingDays"></p>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="label">販売価格<span class="req">必須</span></div>
+              <div class="control">
+                <div class="price-input">
+                  <span class="yen">¥</span>
+                  <input id="price" name="price" type="number" inputmode="numeric" min="300" max="9999999" />
+                </div>
+                <div class="fee-box">
+                  <div class="fee-row">
+                    <span>販売手数料（<span id="fee-rate">10</span>%）</span>
+                    <span id="fee">-¥0</span>
+                  </div>
+                  <div class="fee-row">
+                    <span>振込金額</span>
+                    <span class="payout" id="payout">¥0</span>
+                  </div>
+                </div>
+                <p class="field-error" id="err-price"></p>
+              </div>
+            </div>
+
+            <div class="actions">
+              <button class="primary" id="submit" type="submit">出品する</button>
+            </div>
+          </form>
+
+          <div id="done" class="done" hidden>
+            <div class="mark" id="done-mark">✓</div>
+            <h2 id="done-title">出品が完了しました</h2>
+            <p class="item-id">商品ID: <span id="done-id"></span></p>
+            <p class="note" id="done-note"></p>
+            <button class="secondary" id="again" type="button">続けて出品する</button>
+          </div>
+        </section>
+
+        <aside class="side">
+          <h2>出品内容のプレビュー</h2>
+          <div class="preview">
+            <div class="thumb" id="preview-thumb">
+              <img src="/sample-camera.jpg" alt="" id="preview-image" />
+              <span class="badge" id="preview-badge" hidden></span>
+            </div>
+            <div class="info">
+              <div class="name" id="preview-name">商品名を入力してください</div>
+              <div class="price">
+                <span id="preview-price">¥0</span><span class="tax">（税込）</span>
+              </div>
+              <div class="meta">
+                <div id="preview-condition">商品の状態</div>
+                <div id="preview-shipping">配送料の負担</div>
+                <div id="preview-days">発送までの日数</div>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
     </main>
 
-    <footer>
-      このページはデモです。投稿された内容は
-      <a href="/ops">運用画面</a>
-      で確認できます。
+    <footer class="site-footer">
+      これはデモです。出品内容は下書きとして初期表示しています。
+      <a href="/ops">判定の裏側（開発者向け）</a>
     </footer>
 
     <script src="/app.js" type="module"></script>

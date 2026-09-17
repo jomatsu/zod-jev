@@ -21,8 +21,8 @@
   "durable_objects": {
     "bindings": [
       {
-        "name": "REVIEW_STORE",
-        "class_name": "ReviewStore"
+        "name": "LISTING_STORE",
+        "class_name": "ListingStore"
       }
     ]
   },
@@ -30,6 +30,11 @@
     {
       "tag": "v1",
       "new_sqlite_classes": ["ReviewStore"]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["ListingStore"],
+      "deleted_classes": ["ReviewStore"]
     }
   ],
   "routes": [

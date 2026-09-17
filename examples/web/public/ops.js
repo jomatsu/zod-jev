@@ -1,41 +1,43 @@
-// 運用画面: フォームの裏側で JEV が何を判定したかを見るページ。
+// 開発者向け: 出品フォームの裏側で JEV が何を判定したかを見るページ。
 const STATUS_LABEL = {
-  pending: "掲載待ち",
+  published: "公開中",
   review: "審査中",
-  rejected: "差し戻し",
+  rejected: "出品不可",
   invalid: "形式エラー",
 };
 
 const open = new Set();
 let rendered = false;
 
-function el(tag, className, text) {
+const el = (tag, className, text) => {
   const node = document.createElement(tag);
   if (className) node.className = className;
   if (text !== undefined) node.textContent = text;
   return node;
-}
+};
+
+const yen = (value) => `¥${Number(value).toLocaleString("ja-JP")}`;
 
 async function refresh() {
   const [metaResponse, listResponse] = await Promise.all([
     fetch("/api/meta"),
-    fetch("/api/reviews"),
+    fetch("/api/listings"),
   ]);
   const meta = await metaResponse.json();
-  const { submissions } = await listResponse.json();
+  const { records } = await listResponse.json();
 
   document.querySelector("#mode-pill").textContent = `mode=${meta.mode}`;
   document.querySelector("#api-pill").textContent = meta.fake
     ? "--fake（偽の判定・課金なし）"
     : `実 API: ${meta.endpoint}`;
-  document.querySelector("#count").textContent = `${submissions.length} 件`;
+  document.querySelector("#count").textContent = `${records.length} 件`;
 
   if (!rendered) {
     renderRules(meta.rules);
     renderSamples(meta.samples);
     rendered = true;
   }
-  renderList(submissions);
+  renderList(records);
 }
 
 function renderRules(rules) {
@@ -69,10 +71,10 @@ function renderSamples(samples) {
       button.type = "button";
       button.addEventListener("click", async () => {
         button.disabled = true;
-        await fetch("/api/reviews", {
+        await fetch("/api/listings", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify(sample.review),
+          body: JSON.stringify(sample.listing),
         });
         button.disabled = false;
         await refresh();
@@ -82,13 +84,13 @@ function renderSamples(samples) {
   );
 }
 
-function renderList(submissions) {
+function renderList(records) {
   const list = document.querySelector("#list");
-  if (submissions.length === 0) {
-    list.replaceChildren(el("p", "muted", "まだ投稿がありません。"));
+  if (records.length === 0) {
+    list.replaceChildren(el("p", "muted", "まだ出品がありません。"));
     return;
   }
-  list.replaceChildren(...submissions.map(renderSubmission));
+  list.replaceChildren(...records.map(renderRecord));
 }
 
 function probabilityBar(probability, threshold) {
@@ -120,7 +122,7 @@ function renderIssue(issue) {
   } else {
     head.append(el("span", "rule-id", details.ruleId));
   }
-  if (issue.path.length > 0) head.append(el("span", "path", issue.path.join(".")));
+  if (issue.path.length > 0) head.append(el("span", "muted", issue.path.join(".")));
   if (details.kind !== "unavailable") {
     head.append(
       el("span", "prob", `P=${details.probability.toFixed(2)} / 閾値=${details.threshold.toFixed(2)}`),
@@ -134,51 +136,55 @@ function renderIssue(issue) {
   return box;
 }
 
-function renderSubmission(submission) {
-  const details = el("details", "submission");
-  details.open = open.has(submission.id);
+function renderRecord(record) {
+  const details = el("details", "record");
+  details.open = open.has(record.id);
   details.addEventListener("toggle", () => {
-    if (details.open) open.add(submission.id);
-    else open.delete(submission.id);
+    if (details.open) open.add(record.id);
+    else open.delete(record.id);
   });
 
   const summary = el("summary");
-  summary.append(el("span", `pill ${submission.status}`, STATUS_LABEL[submission.status]));
-  summary.append(el("span", "muted", submission.at.slice(11, 19)));
-  summary.append(el("span", "muted", `★${submission.review.rating}`));
-  summary.append(el("span", undefined, submission.review.title));
-  summary.append(el("span", "excerpt", submission.review.body));
-  summary.append(el("span", "muted", submission.id));
+  summary.append(el("span", `pill ${record.status}`, STATUS_LABEL[record.status]));
+  summary.append(el("span", "muted", record.at.slice(11, 19)));
+  summary.append(el("span", undefined, yen(record.listing.price)));
+  summary.append(el("span", undefined, record.listing.title));
+  summary.append(el("span", "excerpt", record.listing.body));
+  summary.append(el("span", "muted", record.id));
   details.append(summary);
 
-  const body = el("div", "body");
+  const body = el("div", "detail");
   body.append(
-    el("p", "muted", `${submission.review.nickname} / ★${submission.review.rating} / ${submission.review.title}`),
+    el(
+      "p",
+      "muted",
+      `${record.listing.category} / ${record.listing.condition} / ${record.listing.shippingFee} / ${record.listing.shippingDays}`,
+    ),
   );
-  body.append(el("p", undefined, submission.review.body));
+  body.append(el("p", undefined, record.listing.body));
 
-  if (submission.mode === "shadow") {
+  if (record.mode === "shadow") {
     body.append(
-      el("p", "note", "shadow モードの記録です。この投稿は「掲載待ち」のままで、判定は挙動に使っていません。"),
+      el("p", "muted", "shadow モードの記録です。この出品は「公開中」のままで、判定は挙動に使っていません。"),
     );
   }
 
-  if (submission.issues.length === 0) {
+  if (record.issues.length === 0) {
     body.append(el("p", "muted", "意味の条件はすべて成立しています（issue なし）。"));
   } else {
     const issues = el("div");
-    for (const issue of submission.issues) issues.append(renderIssue(issue));
+    for (const issue of record.issues) issues.append(renderIssue(issue));
     body.append(issues);
   }
 
   const metrics = el("div", "metrics");
   const items = [
-    `mode=${submission.mode}`,
-    submission.jev.model === null ? null : `model=${submission.jev.model}`,
-    submission.jev.questionCount > 0 ? `questions=${submission.jev.questionCount}` : null,
-    `input_tokens=${submission.jev.inputTokens}`,
-    `output_tokens=${submission.jev.outputTokens}`,
-    `latency=${submission.jev.latencyMs}ms`,
+    `mode=${record.mode}`,
+    record.jev.model === null ? null : `model=${record.jev.model}`,
+    record.jev.questionCount > 0 ? `questions=${record.jev.questionCount}` : null,
+    `input_tokens=${record.jev.inputTokens}`,
+    `output_tokens=${record.jev.outputTokens}`,
+    `latency=${record.jev.latencyMs}ms`,
   ].filter((item) => item !== null);
   for (const item of items) metrics.append(el("span", undefined, item));
   body.append(metrics);
@@ -191,9 +197,9 @@ function renderSubmission(submission) {
       "json",
       JSON.stringify(
         {
-          state: submission.jev.state,
-          questions: submission.jev.questions,
-          answers: submission.jev.answers,
+          state: record.jev.state,
+          questions: record.jev.questions,
+          answers: record.jev.answers,
         },
         null,
         2,
