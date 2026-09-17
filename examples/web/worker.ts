@@ -138,8 +138,9 @@ export default {
       if (url.pathname === "/api/listings" && request.method === "POST") {
         const { service } = getService(env);
         const input = await request.json().catch(() => null);
-        const result = await service.submit(input);
-        return json(result, result.ok ? 201 : 422);
+        const { record, ...result } = await service.submit(input);
+        // demo はデモ操作パネル用の裏側の判定内容。本番の API では返さないこと。
+        return json({ ...result, demo: record ?? null }, result.ok ? 201 : 422);
       }
 
       if (url.pathname === "/api/listings" && request.method === "GET") {

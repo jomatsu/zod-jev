@@ -69,9 +69,10 @@ async function handle(request: IncomingMessage, response: ServerResponse): Promi
 
   if (request.method === "POST" && url.pathname === "/api/listings") {
     const input = await readJson(request);
-    const result = await service.submit(input);
+    const { record, ...result } = await service.submit(input);
     // 出品できない場合は 422（フォームのバリデーションエラーとして返す）
-    return sendJson(response, result.ok ? 201 : 422, result);
+    // demo はデモ操作パネル用の裏側の判定内容。本番の API では返さないこと。
+    return sendJson(response, result.ok ? 201 : 422, { ...result, demo: record ?? null });
   }
 
   if (request.method === "GET" && url.pathname === "/api/listings") {

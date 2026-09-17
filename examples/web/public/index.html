@@ -7,6 +7,40 @@
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
+    <!-- ここから下は「デモ操作パネル」。フリマアプリ風の画面（.app-frame）の一部ではありません。 -->
+    <aside class="demo-console" id="demo-console">
+      <div class="demo-head">
+        <span class="demo-badge">DEMO</span>
+        <strong>デモ操作パネル</strong>
+      </div>
+      <p class="demo-note">
+        左側はフリマアプリ風の画面です（JEV の存在は見えません）。<strong>このパネルはアプリの一部ではありません。</strong>
+        ここから例を入れて出品すると、弾かれる様子と裏側の判定が確認できます。
+      </p>
+
+      <section class="demo-section">
+        <h3>1. 例を入れる（1クリック）</h3>
+        <div id="demo-samples" class="demo-samples"></div>
+        <button class="demo-ghost" id="demo-reset" type="button">初期状態（下書き）に戻す</button>
+      </section>
+
+      <section class="demo-section">
+        <h3>2. 直前の出品の判定（裏側）</h3>
+        <div id="demo-result">
+          <p class="demo-muted">まだ出品していません。左の「出品する」を押してください。</p>
+        </div>
+      </section>
+
+      <section class="demo-section">
+        <h3>3. 詳しく見る</h3>
+        <p class="demo-muted">
+          条件の一覧と過去の判定は <a href="/ops">/ops</a> にあります。
+          <span id="demo-mode"></span>
+        </p>
+      </section>
+    </aside>
+
+    <div class="app-frame">
     <header class="global-header">
       <div class="inner">
         <span class="wordmark">フリマ</span>
@@ -27,17 +61,9 @@
             <h1>出品</h1>
             <div class="draft">
               <span id="draft-note">前回の下書きを復元しました</span>
-              <a href="#" id="draft-toggle">下書き一覧</a>
               <a href="#" id="draft-clear">クリア</a>
             </div>
           </div>
-
-          <section class="drafts" id="drafts" hidden>
-            <p class="drafts-note">
-              下書きの一覧です。クリックすると内容が復元されます（デモ用に、出品できない例も入っています）。
-            </p>
-            <div class="draft-list" id="draft-list"></div>
-          </section>
 
           <div id="banner" class="error-banner" hidden></div>
 
@@ -164,10 +190,9 @@
       </div>
     </main>
 
-    <footer class="site-footer">
-      これはデモです。出品内容は下書きとして初期表示しています。
-      <a href="/ops">判定の裏側（開発者向け）</a>
-    </footer>
+    <footer class="site-footer">フリマアプリ風の画面（この部分はアプリの一部です）</footer>
+
+    </div>
 
     <script src="/app.js" type="module"></script>
   </body>

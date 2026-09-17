@@ -165,13 +165,21 @@ export interface ListingRecord {
 }
 
 export type SubmitResult =
-  | { readonly ok: true; readonly id: string; readonly status: "published" | "review" }
+  | {
+      readonly ok: true;
+      readonly id: string;
+      readonly status: "published" | "review";
+      /** 裏側の判定内容（デモの操作パネルと /ops 用。本番の API では返さないこと） */
+      readonly record: ListingRecord;
+    }
   | {
       readonly ok: false;
       /** フィールドごとのエラー（フォームのインライン表示に使う） */
       readonly fieldErrors: Readonly<Record<string, readonly string[]>>;
       /** フィールドに紐づかないエラー */
       readonly formErrors: readonly string[];
+      /** 形式エラーのときは判定していないので undefined */
+      readonly record?: ListingRecord;
     };
 
 /**
@@ -333,15 +341,17 @@ export function createListingService(deps: ListingServiceDeps) {
           else (fieldErrors[field] ??= []).push(issue.message);
         }
         // 弾いた出品も運用画面には残す（どんな出品が差し戻されたかを見るため）
-        await store.add(buildRecord("rejected", listing, issues, capture, id));
-        return { ok: false, fieldErrors, formErrors };
+        const record = buildRecord("rejected", listing, issues, capture, id);
+        await store.add(record);
+        return { ok: false, fieldErrors, formErrors, record };
       }
 
       // uncertain / unavailable は受け付けて「審査中」。shadow / off は記録だけで「公開中」。
       const status: "published" | "review" =
         deps.mode === "enforce" && issues.length > 0 ? "review" : "published";
-      await store.add(buildRecord(status, listing, issues, capture, id));
-      return { ok: true, id, status };
+      const record = buildRecord(status, listing, issues, capture, id);
+      await store.add(record);
+      return { ok: true, id, status, record };
     },
 
     /** 運用画面用。新しい順。 */

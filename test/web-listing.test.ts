@@ -42,6 +42,8 @@ describe("出品画面の裏側（listing service）", () => {
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
+    // 形式エラーのときは判定していないので record は無い
+    expect(result.record).toBeUndefined();
     expect(result.fieldErrors.title).toEqual(["商品名を入力してください"]);
     expect(result.fieldErrors.body).toEqual(["商品の説明は10文字以上で入力してください"]);
     expect(result.fieldErrors.price).toEqual(["価格は300円以上で入力してください"]);
@@ -55,6 +57,9 @@ describe("出品画面の裏側（listing service）", () => {
     const result = await service.submit(draft);
 
     expect(result).toMatchObject({ ok: true, status: "published", id: "m00000000001" });
+    // デモ操作パネル用に、裏側の判定内容も一緒に返す
+    expect(result.record).toMatchObject({ status: "published", issues: [] });
+    expect(result.record!.jev.questionCount).toBe(ListingRules.length);
     // 6 条件を 1 リクエストにまとめて送る
     expect(recorder.calls).toHaveLength(1);
     expect(Object.keys(recorder.calls[0]!.body.questions)).toHaveLength(ListingRules.length);
@@ -83,6 +88,12 @@ describe("出品画面の裏側（listing service）", () => {
     expect(result.fieldErrors.body).toEqual([
       "出品できない商品が含まれています。出品ガイドラインをご確認ください。",
     ]);
+    expect(result.record).toMatchObject({ status: "rejected" });
+    expect(result.record!.issues[0]!.details).toMatchObject({
+      kind: "rejected",
+      ruleId: "no_prohibited_items",
+      probability: 0.03,
+    });
     expect((await service.list())[0]).toMatchObject({ status: "rejected" });
   });
 

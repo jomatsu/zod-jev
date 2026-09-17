@@ -1,6 +1,8 @@
-// 出品画面（利用者向け）。
-// JEV の存在・確率・条件 ID は出さない。表示は「出品が完了しました / 審査中です /
-// 出品できません（理由は該当項目の下）」という普通の結果だけ。
+// 出品画面（フリマアプリ風の部分）と、デモ操作パネル（メタUI）の両方を扱う。
+//
+// - フリマ風の画面（.app-frame の中）: 普通の出品フォーム。JEV の存在・確率・条件 ID は出さない
+// - デモ操作パネル（.demo-console）: 例を入れるボタンと、直前の出品を裏側から見た結果。
+//   アプリの一部ではないことが分かるように、見た目も文言も分けてある。
 const form = document.querySelector("#form");
 const banner = document.querySelector("#banner");
 const done = document.querySelector("#done");
@@ -16,34 +18,45 @@ const FIELDS = [
   "price",
 ];
 
-/**
- * 下書き（実際のアプリでも下書きは保存される）。
- * デモ用の一覧はサーバーの /api/meta から受け取り、1 件目を初期表示に使う。
- */
 let drafts = [];
-let currentDraft = 0;
+let meta = {
+  feeRate: 0.1,
+  rules: [],
+  options: { categories: [], conditions: [], shippingFees: [], shippingDays: [] },
+};
 
-let meta = { feeRate: 0.1, options: { categories: [], conditions: [], shippingFees: [], shippingDays: [] } };
+const STATUS_LABEL = {
+  published: "公開中",
+  review: "審査中",
+  rejected: "出品不可",
+  invalid: "形式エラー",
+};
 
 const yen = (value) => `¥${value.toLocaleString("ja-JP")}`;
 
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
 function fillSelect(id, values, selected) {
   const select = document.querySelector(`#${id}`);
-  const placeholder = document.createElement("option");
+  const placeholder = el("option", undefined, "選択してください");
   placeholder.value = "";
-  placeholder.textContent = "選択してください";
   select.replaceChildren(
     placeholder,
     ...values.map((value) => {
-      const option = document.createElement("option");
+      const option = el("option", undefined, value);
       option.value = value;
-      option.textContent = value;
       option.selected = value === selected;
       return option;
     }),
   );
 }
 
+/** 写真の枠を差し替える（写真のない下書きはプレースホルダに戻す）。 */
 function setPhoto(hasPhoto) {
   const slot = document.querySelector("#photo-1");
   slot.classList.toggle("filled", hasPhoto);
@@ -57,87 +70,6 @@ function setPhoto(hasPhoto) {
     slot.textContent = "＋";
   }
   document.querySelector("#preview-image").hidden = !hasPhoto;
-}
-
-/** 下書きをフォームに復元する。 */
-function applyDraft(index) {
-  const draft = drafts[index] ?? drafts[0];
-  if (draft === undefined) return;
-  currentDraft = index;
-  const listing = draft.listing;
-
-  form.title.value = listing.title;
-  form.body.value = listing.body;
-  form.category.value = listing.category;
-  form.condition.value = listing.condition;
-  form.shippingFee.value = listing.shippingFee;
-  form.shippingDays.value = listing.shippingDays;
-  form.price.value = String(listing.price);
-
-  document.querySelector("#draft-note").textContent = "下書きを復元しました";
-  setPhoto(draft.photo !== false);
-  document.querySelector("#drafts").hidden = true;
-  clearErrors();
-  sync();
-  markCurrentDraft();
-}
-
-function clearDraft() {
-  for (const field of FIELDS) {
-    if (form[field]) form[field].value = "";
-  }
-  document.querySelector("#draft-note").textContent = "下書きはありません";
-  setPhoto(false);
-  document.querySelector("#drafts").hidden = true;
-  clearErrors();
-  sync();
-  markCurrentDraft();
-}
-
-function markCurrentDraft() {
-  for (const node of document.querySelectorAll(".draft-item")) {
-    node.classList.toggle("is-current", Number(node.dataset.index) === currentDraft);
-  }
-}
-
-function renderDrafts() {
-  const list = document.querySelector("#draft-list");
-  list.replaceChildren(
-    ...drafts.map((draft, index) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "draft-item";
-      button.dataset.index = String(index);
-      button.addEventListener("click", () => applyDraft(index));
-
-      const thumb = document.createElement(draft.photo === false ? "div" : "img");
-      thumb.className = "thumb";
-      if (draft.photo === false) thumb.textContent = "＋";
-      else {
-        thumb.src = "/sample-camera.jpg";
-        thumb.alt = "";
-      }
-      button.append(thumb);
-
-      const info = document.createElement("div");
-      info.className = "info";
-      const name = document.createElement("div");
-      name.className = "name";
-      name.textContent = draft.listing.title;
-      const metaLine = document.createElement("div");
-      metaLine.className = "meta";
-      metaLine.textContent = `${draft.label} / ${draft.updated ?? ""}`;
-      info.append(name, metaLine);
-      button.append(info);
-
-      const pick = document.createElement("span");
-      pick.className = "pick";
-      pick.textContent = "この内容で入力";
-      button.append(pick);
-      return button;
-    }),
-  );
-  markCurrentDraft();
 }
 
 function clearErrors() {
@@ -159,16 +91,10 @@ function showErrors(fieldErrors, formErrors) {
   unplaced.push(...(formErrors ?? []));
 
   banner.replaceChildren();
-  const title = document.createElement("strong");
-  title.textContent = "出品できませんでした。入力内容をご確認ください。";
-  banner.append(title);
+  banner.append(el("strong", undefined, "出品できませんでした。入力内容をご確認ください。"));
   if (unplaced.length > 0) {
-    const list = document.createElement("ul");
-    for (const message of unplaced) {
-      const item = document.createElement("li");
-      item.textContent = message;
-      list.append(item);
-    }
+    const list = el("ul");
+    for (const message of unplaced) list.append(el("li", undefined, message));
     banner.append(list);
   }
   banner.hidden = false;
@@ -197,22 +123,148 @@ function showBadge(status) {
   badge.textContent = status === "published" ? "公開中" : "審査中";
 }
 
-function showDone(result) {
-  form.hidden = true;
-  banner.hidden = true;
-  done.hidden = false;
-  document.querySelector("#done-id").textContent = result.id;
-  if (result.status === "review") {
-    document.querySelector("#done-title").textContent = "出品を受け付けました";
-    document.querySelector("#done-note").textContent =
-      "内容を確認しています。審査が終わり次第、商品が公開されます。";
-  } else {
-    document.querySelector("#done-title").textContent = "出品が完了しました";
-    document.querySelector("#done-note").textContent =
-      "商品が公開されました。購入者からのメッセージをお待ちください。";
-  }
-  showBadge(result.status);
+function showForm() {
+  done.hidden = true;
+  form.hidden = false;
+  document.querySelector("#preview-badge").hidden = true;
 }
+
+/** 下書きをフォームに復元する。 */
+function applyDraft(index) {
+  const draft = drafts[index] ?? drafts[0];
+  if (draft === undefined) return;
+  const listing = draft.listing;
+
+  form.title.value = listing.title;
+  form.body.value = listing.body;
+  form.category.value = listing.category;
+  form.condition.value = listing.condition;
+  form.shippingFee.value = listing.shippingFee;
+  form.shippingDays.value = listing.shippingDays;
+  form.price.value = String(listing.price);
+
+  document.querySelector("#draft-note").textContent =
+    index === 0 ? "前回の下書きを復元しました" : "下書きを復元しました";
+  setPhoto(draft.photo !== false);
+  clearErrors();
+  sync();
+}
+
+function clearDraft() {
+  for (const field of FIELDS) {
+    if (form[field]) form[field].value = "";
+  }
+  document.querySelector("#draft-note").textContent = "下書きはありません";
+  setPhoto(false);
+  clearErrors();
+  sync();
+}
+
+/* ---------------------------------------------------------------------------
+   デモ操作パネル（メタUI）。フリマ風の画面の外側に置く。
+   --------------------------------------------------------------------------- */
+
+/** 「例を入れる」ボタン。 */
+function renderSamples() {
+  const box = document.querySelector("#demo-samples");
+  box.replaceChildren(
+    ...drafts.map((draft, index) => {
+      const button = el("button", "demo-sample");
+      button.type = "button";
+      button.addEventListener("click", () => {
+        showForm();
+        applyDraft(index);
+      });
+      button.append(el("span", "demo-sample-name", draft.label));
+      button.append(el("span", "demo-sample-item", draft.listing.title));
+      return button;
+    }),
+  );
+}
+
+/** 直前の出品を裏側から見た結果。 */
+function renderJudgment(record) {
+  const box = document.querySelector("#demo-result");
+  if (record === null || record === undefined) {
+    box.replaceChildren(
+      el("p", "demo-muted", "まだ出品していません。左の「出品する」を押してください。"),
+    );
+    return;
+  }
+
+  const head = el("div", "demo-result-head");
+  head.append(el("span", `demo-status ${record.status}`, STATUS_LABEL[record.status] ?? record.status));
+  head.append(el("span", "demo-muted", record.id));
+  box.replaceChildren(head);
+
+  const kinds = new Map();
+  for (const issue of record.issues) {
+    if (issue.details.ruleId !== undefined) kinds.set(issue.details.ruleId, issue.details.kind);
+  }
+  const answers = record.jev.answers ?? {};
+  const questionKeys = Object.keys(record.jev.questions ?? {});
+
+  const table = el("table", "demo-table");
+  const tbody = el("tbody");
+  meta.rules.forEach((rule, index) => {
+    const probability = answers[questionKeys[index]]?.noul;
+    const kind = kinds.get(rule.id);
+    const row = el("tr");
+
+    const mark = el("td", "demo-mark", kind === "rejected" ? "✗" : kind === "uncertain" ? "▲" : "✓");
+    mark.classList.add(kind === "rejected" ? "bad" : kind === "uncertain" ? "warn" : "ok");
+    row.append(mark);
+    row.append(el("td", "demo-rule", rule.id));
+
+    const value = el("td", "demo-prob");
+    value.textContent = probability === undefined ? "—" : probability.toFixed(2);
+    row.append(value);
+
+    const cell = el("td", "demo-bar-cell");
+    const track = el("div", "demo-bar");
+    const fill = el("div", `demo-bar-fill ${kind === "rejected" ? "bad" : kind === "uncertain" ? "warn" : "ok"}`);
+    fill.style.width = `${Math.round((probability ?? 0) * 100)}%`;
+    track.append(fill);
+    const threshold = el("div", "demo-bar-threshold");
+    threshold.style.left = `${(rule.threshold * 100).toFixed(1)}%`;
+    threshold.title = `合格の閾値: ${rule.threshold.toFixed(2)}`;
+    track.append(threshold);
+    cell.append(track);
+    row.append(cell);
+
+    tbody.append(row);
+  });
+  table.append(tbody);
+  box.append(table);
+
+  box.append(
+    el(
+      "p",
+      "demo-muted demo-metrics",
+      [
+        `model=${record.jev.model ?? "-"}`,
+        `questions=${record.jev.questionCount}`,
+        `tokens=${record.jev.inputTokens}`,
+        `${record.jev.latencyMs}ms`,
+      ].join(" / "),
+    ),
+  );
+  box.append(
+    el(
+      "p",
+      "demo-verdict",
+      record.status === "rejected"
+        ? "→ 出品不可（理由は該当項目の下に出る）"
+        : record.status === "review"
+          ? "→ 審査中（利用者には「審査が終わり次第公開」とだけ出る）"
+          : "→ 公開中（全条件が成立）",
+    ),
+  );
+}
+
+/* ---------------------------------------------------------------------------
+   送信
+   --------------------------------------------------------------------------- */
 
 async function submitListing(event) {
   event.preventDefault();
@@ -236,17 +288,34 @@ async function submitListing(event) {
     });
     const data = await response.json();
 
+    // デモ操作パネルに裏側の判定を出す（本番の API はこの情報を返さない）
+    renderJudgment(data.demo ?? null);
+
     if (response.status === 422) {
       showErrors(data.fieldErrors, data.formErrors);
       return;
     }
     if (!response.ok) throw new Error(data.error ?? "出品できませんでした");
-    showDone(data);
+
+    form.hidden = true;
+    banner.hidden = true;
+    done.hidden = false;
+    document.querySelector("#done-id").textContent = data.id;
+    if (data.status === "review") {
+      document.querySelector("#done-title").textContent = "出品を受け付けました";
+      document.querySelector("#done-note").textContent =
+        "内容を確認しています。審査が終わり次第、商品が公開されます。";
+    } else {
+      document.querySelector("#done-title").textContent = "出品が完了しました";
+      document.querySelector("#done-note").textContent =
+        "商品が公開されました。購入者からのメッセージをお待ちください。";
+    }
+    showBadge(data.status);
   } catch (error) {
     banner.replaceChildren();
-    const title = document.createElement("strong");
-    title.textContent = `出品できませんでした。（${String(error.message ?? error)}）`;
-    banner.append(title);
+    banner.append(
+      el("strong", undefined, `出品できませんでした。（${String(error.message ?? error)}）`),
+    );
     banner.hidden = false;
   } finally {
     submit.disabled = false;
@@ -257,38 +326,37 @@ async function submitListing(event) {
 async function main() {
   meta = await (await fetch("/api/meta")).json();
   drafts = meta.samples ?? [];
+
   fillSelect("category", meta.options.categories, "");
   fillSelect("condition", meta.options.conditions, "");
   fillSelect("shippingFee", meta.options.shippingFees, "");
   fillSelect("shippingDays", meta.options.shippingDays, "");
   document.querySelector("#fee-rate").textContent = String(Math.round(meta.feeRate * 100));
-  renderDrafts();
+  document.querySelector("#demo-mode").textContent = meta.fake
+    ? "いまは --fake（偽の判定・課金なし）で動いています。"
+    : "いまは実 API に問い合わせています。";
+  renderSamples();
 
   form.addEventListener("submit", submitListing);
   form.addEventListener("input", sync);
   form.addEventListener("change", sync);
-  document.querySelector("#draft-toggle").addEventListener("click", (event) => {
-    event.preventDefault();
-    const panel = document.querySelector("#drafts");
-    panel.hidden = !panel.hidden;
-    if (!panel.hidden) panel.scrollIntoView({ block: "nearest" });
-  });
   document.querySelector("#draft-clear").addEventListener("click", (event) => {
     event.preventDefault();
     clearDraft();
   });
+  document.querySelector("#demo-reset").addEventListener("click", () => {
+    showForm();
+    applyDraft(0);
+    renderJudgment(null);
+  });
   document.querySelector("#again").addEventListener("click", () => {
-    done.hidden = true;
-    form.hidden = false;
-    document.querySelector("#preview-badge").hidden = true;
-    applyDraft(0); // 続けて出品するときは 1 件目の下書きから始める
+    showForm();
+    applyDraft(0);
   });
   for (const slot of document.querySelectorAll(".photo.add")) {
     slot.addEventListener("click", () => {
       banner.replaceChildren();
-      const note = document.createElement("strong");
-      note.textContent = "デモのため画像の追加はできません。";
-      banner.append(note);
+      banner.append(el("strong", undefined, "デモのため画像の追加はできません。"));
       banner.hidden = false;
     });
   }

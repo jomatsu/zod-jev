@@ -141,86 +141,264 @@ a:hover {
   margin-left: 10px;
 }
 
-/* --- 下書き一覧 ------------------------------------------------------------ */
-.drafts {
-  border-bottom: 1px solid var(--line);
-  padding: 10px 0 12px;
-  margin-bottom: 2px;
-}
-
-.drafts-note {
-  margin: 0 0 8px;
-  font-size: 11.5px;
-  color: var(--muted);
-}
-
-.draft-list {
-  display: grid;
-  gap: 6px;
-  max-height: 218px;
+/* =========================================================================
+   デモ操作パネル（メタUI）。フリマ風の画面（.app-frame）の一部ではないことが
+   一目で分かるように、暗い配色・等幅フォント・DEMO バッジで分けてある。
+   ========================================================================= */
+.demo-console {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 10;
+  width: 340px;
+  height: 100vh;
   overflow-y: auto;
+  padding: 16px 16px 28px;
+  background: #14161c;
+  color: #e6e9ef;
+  border-left: 3px dashed #3b4250;
+  font-size: 12.5px;
+  line-height: 1.6;
 }
 
-.draft-item {
+.demo-head {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  font-size: 14px;
+  color: #fff;
+}
+
+.demo-badge {
+  padding: 1px 7px;
+  border-radius: 3px;
+  background: #ffd24a;
+  color: #23262e;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.demo-note {
+  margin: 8px 0 0;
+  color: #b9c0cf;
+}
+
+.demo-note strong {
+  color: #ffd24a;
+}
+
+.demo-section {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #262b36;
+}
+
+.demo-section h3 {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.demo-muted {
+  margin: 6px 0 0;
+  color: #98a1b3;
+  font-size: 11.5px;
+}
+
+.demo-samples {
+  display: grid;
+  gap: 6px;
+}
+
+.demo-sample {
+  display: grid;
+  gap: 1px;
   width: 100%;
   padding: 7px 10px;
-  border: 1px solid var(--line-strong);
+  border: 1px solid #333a47;
   border-radius: 4px;
-  background: #fff;
+  background: #1b1f27;
+  color: #e6e9ef;
   font-family: inherit;
-  font-size: 13px;
-  color: inherit;
+  font-size: 12px;
   text-align: left;
   cursor: pointer;
 }
 
-.draft-item:hover {
-  border-color: var(--accent);
-  background: #fffafa;
+.demo-sample:hover {
+  border-color: #ffd24a;
+  background: #22262f;
 }
 
-.draft-item.is-current {
-  border-color: var(--accent);
+.demo-sample-name {
+  font-weight: 700;
 }
 
-.draft-item .thumb {
-  flex: none;
-  width: 40px;
-  height: 40px;
-  border-radius: 3px;
-  border: 1px solid var(--line);
-  background: #f5f5f5;
-  object-fit: cover;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #bbb;
-  font-size: 15px;
-}
-
-.draft-item .info {
-  min-width: 0;
-}
-
-.draft-item .name {
+.demo-sample-item {
+  color: #98a1b3;
+  font-size: 11px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.draft-item .meta {
-  font-size: 11px;
-  color: var(--muted);
+.demo-ghost {
+  margin-top: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px dashed #3b4250;
+  border-radius: 4px;
+  background: transparent;
+  color: #b9c0cf;
+  font-family: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
 }
 
-.draft-item .pick {
-  margin-left: auto;
-  flex: none;
+.demo-ghost:hover {
+  color: #fff;
+  border-color: #ffd24a;
+}
+
+.demo-result-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.demo-status {
+  padding: 1px 8px;
+  border-radius: 3px;
   font-size: 11px;
-  color: var(--link);
+  font-weight: 800;
+}
+
+.demo-status.published {
+  background: #1e5c3a;
+  color: #b9f6ce;
+}
+
+.demo-status.review {
+  background: #6b4b06;
+  color: #ffe6a8;
+}
+
+.demo-status.rejected {
+  background: #6b1f1f;
+  color: #ffc9c9;
+}
+
+.demo-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.demo-table td {
+  padding: 4px 2px;
+  border-bottom: 1px solid #232833;
+  vertical-align: middle;
+}
+
+.demo-mark {
+  width: 16px;
+  font-weight: 800;
+}
+
+.demo-mark.ok {
+  color: #4ade80;
+}
+
+.demo-mark.warn {
+  color: #fbbf24;
+}
+
+.demo-mark.bad {
+  color: #f87171;
+}
+
+.demo-rule {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 10.5px;
+  color: #9ec1ff;
+  overflow-wrap: anywhere;
+}
+
+.demo-prob {
+  width: 30px;
+  text-align: right;
+  font-family: ui-monospace, Menlo, monospace;
+  color: #e6e9ef;
+}
+
+.demo-bar-cell {
+  width: 58px;
+}
+
+.demo-bar {
+  position: relative;
+  height: 7px;
+  border-radius: 999px;
+  background: #262b36;
+  overflow: hidden;
+}
+
+.demo-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.demo-bar-fill.ok {
+  background: #3f9d6b;
+}
+
+.demo-bar-fill.warn {
+  background: #b8860b;
+}
+
+.demo-bar-fill.bad {
+  background: #b34747;
+}
+
+.demo-bar-threshold {
+  position: absolute;
+  top: -2px;
+  width: 2px;
+  height: 11px;
+  background: #b9c0cf;
+}
+
+.demo-metrics {
+  font-family: ui-monospace, Menlo, monospace;
+}
+
+.demo-verdict {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #ffd24a;
+}
+
+/* フリマ風の画面は、デモ操作パネルのぶんだけ左に寄せる */
+.app-frame {
+  padding-right: 340px;
+}
+
+@media (max-width: 1180px) {
+  .demo-console {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 12px;
+    border: 3px dashed #3b4250;
+    border-radius: 8px;
+  }
+
+  .app-frame {
+    padding-right: 0;
+  }
 }
 
 /* --- フォームの行 ---------------------------------------------------------- */
