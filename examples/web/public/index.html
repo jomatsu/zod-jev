@@ -27,10 +27,17 @@
             <h1>出品</h1>
             <div class="draft">
               <span id="draft-note">前回の下書きを復元しました</span>
-              <a href="#" id="draft-restore">下書きを復元</a>
+              <a href="#" id="draft-toggle">下書き一覧</a>
               <a href="#" id="draft-clear">クリア</a>
             </div>
           </div>
+
+          <section class="drafts" id="drafts" hidden>
+            <p class="drafts-note">
+              下書きの一覧です。クリックすると内容が復元されます（デモ用に、出品できない例も入っています）。
+            </p>
+            <div class="draft-list" id="draft-list"></div>
+          </section>
 
           <div id="banner" class="error-banner" hidden></div>
 

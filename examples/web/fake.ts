@@ -13,7 +13,9 @@ const base = {
 
 export const samples = [
   {
-    label: "良い出品（カメラ）",
+    label: "良い出品（そのまま出品できる）",
+    photo: true,
+    updated: "9/17 09:41",
     listing: {
       ...base,
       title: "SONY α7 III ボディ＋標準ズームレンズ",
@@ -24,7 +26,9 @@ export const samples = [
     },
   },
   {
-    label: "連絡先を書いてしまった",
+    label: "説明に連絡先を書いた",
+    photo: true,
+    updated: "9/16 21:12",
     listing: {
       ...base,
       title: "カメラ レンズセット",
@@ -36,6 +40,8 @@ export const samples = [
   },
   {
     label: "出品できない物（市販薬）",
+    photo: false,
+    updated: "9/16 18:03",
     listing: {
       ...base,
       title: "市販の解熱剤 まとめ売り",
@@ -46,7 +52,9 @@ export const samples = [
     },
   },
   {
-    label: "カテゴリー違い",
+    label: "カテゴリーが違う",
+    photo: true,
+    updated: "9/15 22:47",
     listing: {
       ...base,
       title: "SONY α7 III カメラ本体",
@@ -57,7 +65,9 @@ export const samples = [
     },
   },
   {
-    label: "状態と説明が矛盾",
+    label: "状態と説明が矛盾している",
+    photo: true,
+    updated: "9/15 20:15",
     listing: {
       ...base,
       title: "ミラーレスカメラ レンズ付き",
@@ -68,7 +78,9 @@ export const samples = [
     },
   },
   {
-    label: "価格が桁違い",
+    label: "価格が相場から外れている",
+    photo: true,
+    updated: "9/14 11:26",
     listing: {
       ...base,
       title: "SONY α7 III と FE 24-70mm GM のセット",
@@ -79,7 +91,9 @@ export const samples = [
     },
   },
   {
-    label: "説明が薄い（追記を促す）",
+    label: "説明が薄い",
+    photo: true,
+    updated: "9/14 08:52",
     listing: {
       ...base,
       title: "カメラ",

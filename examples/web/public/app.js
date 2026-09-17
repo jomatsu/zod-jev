@@ -16,16 +16,12 @@ const FIELDS = [
   "price",
 ];
 
-/** 前回の下書き（実際のアプリでも下書きは保存される）。 */
-const DRAFT = {
-  title: "SONY α7 III ボディ＋標準ズームレンズ",
-  body: "2023年に購入し、年に数回使いました。シャッター回数は約8,000回です。レンズ（FE 28-70mm）と純正バッテリー2個、充電器、元箱が付属します。室内で保管していたため、目立つ傷や汚れはありません。",
-  category: "家電・スマホ・カメラ",
-  condition: "目立った傷や汚れなし",
-  shippingFee: "送料込み（出品者負担）",
-  shippingDays: "2〜3日で発送",
-  price: 58000,
-};
+/**
+ * 下書き（実際のアプリでも下書きは保存される）。
+ * デモ用の一覧はサーバーの /api/meta から受け取り、1 件目を初期表示に使う。
+ */
+let drafts = [];
+let currentDraft = 0;
 
 let meta = { feeRate: 0.1, options: { categories: [], conditions: [], shippingFees: [], shippingDays: [] } };
 
@@ -48,15 +44,42 @@ function fillSelect(id, values, selected) {
   );
 }
 
-function applyDraft() {
-  for (const field of FIELDS) {
-    if (form[field]) form[field].value = String(DRAFT[field]);
+function setPhoto(hasPhoto) {
+  const slot = document.querySelector("#photo-1");
+  slot.classList.toggle("filled", hasPhoto);
+  slot.replaceChildren();
+  if (hasPhoto) {
+    const image = document.createElement("img");
+    image.src = "/sample-camera.jpg";
+    image.alt = "出品画像";
+    slot.append(image);
+  } else {
+    slot.textContent = "＋";
   }
-  document.querySelector("#draft-note").textContent = "前回の下書きを復元しました";
-  document.querySelector("#photo-1").classList.add("filled");
-  document.querySelector("#preview-image").hidden = false;
+  document.querySelector("#preview-image").hidden = !hasPhoto;
+}
+
+/** 下書きをフォームに復元する。 */
+function applyDraft(index) {
+  const draft = drafts[index] ?? drafts[0];
+  if (draft === undefined) return;
+  currentDraft = index;
+  const listing = draft.listing;
+
+  form.title.value = listing.title;
+  form.body.value = listing.body;
+  form.category.value = listing.category;
+  form.condition.value = listing.condition;
+  form.shippingFee.value = listing.shippingFee;
+  form.shippingDays.value = listing.shippingDays;
+  form.price.value = String(listing.price);
+
+  document.querySelector("#draft-note").textContent = "下書きを復元しました";
+  setPhoto(draft.photo !== false);
+  document.querySelector("#drafts").hidden = true;
   clearErrors();
   sync();
+  markCurrentDraft();
 }
 
 function clearDraft() {
@@ -64,11 +87,57 @@ function clearDraft() {
     if (form[field]) form[field].value = "";
   }
   document.querySelector("#draft-note").textContent = "下書きはありません";
-  document.querySelector("#photo-1").classList.remove("filled");
-  document.querySelector("#photo-1").textContent = "＋";
-  document.querySelector("#preview-image").hidden = true;
+  setPhoto(false);
+  document.querySelector("#drafts").hidden = true;
   clearErrors();
   sync();
+  markCurrentDraft();
+}
+
+function markCurrentDraft() {
+  for (const node of document.querySelectorAll(".draft-item")) {
+    node.classList.toggle("is-current", Number(node.dataset.index) === currentDraft);
+  }
+}
+
+function renderDrafts() {
+  const list = document.querySelector("#draft-list");
+  list.replaceChildren(
+    ...drafts.map((draft, index) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "draft-item";
+      button.dataset.index = String(index);
+      button.addEventListener("click", () => applyDraft(index));
+
+      const thumb = document.createElement(draft.photo === false ? "div" : "img");
+      thumb.className = "thumb";
+      if (draft.photo === false) thumb.textContent = "＋";
+      else {
+        thumb.src = "/sample-camera.jpg";
+        thumb.alt = "";
+      }
+      button.append(thumb);
+
+      const info = document.createElement("div");
+      info.className = "info";
+      const name = document.createElement("div");
+      name.className = "name";
+      name.textContent = draft.listing.title;
+      const metaLine = document.createElement("div");
+      metaLine.className = "meta";
+      metaLine.textContent = `${draft.label} / ${draft.updated ?? ""}`;
+      info.append(name, metaLine);
+      button.append(info);
+
+      const pick = document.createElement("span");
+      pick.className = "pick";
+      pick.textContent = "この内容で入力";
+      button.append(pick);
+      return button;
+    }),
+  );
+  markCurrentDraft();
 }
 
 function clearErrors() {
@@ -187,18 +256,22 @@ async function submitListing(event) {
 
 async function main() {
   meta = await (await fetch("/api/meta")).json();
-  fillSelect("category", meta.options.categories, DRAFT.category);
-  fillSelect("condition", meta.options.conditions, DRAFT.condition);
-  fillSelect("shippingFee", meta.options.shippingFees, DRAFT.shippingFee);
-  fillSelect("shippingDays", meta.options.shippingDays, DRAFT.shippingDays);
+  drafts = meta.samples ?? [];
+  fillSelect("category", meta.options.categories, "");
+  fillSelect("condition", meta.options.conditions, "");
+  fillSelect("shippingFee", meta.options.shippingFees, "");
+  fillSelect("shippingDays", meta.options.shippingDays, "");
   document.querySelector("#fee-rate").textContent = String(Math.round(meta.feeRate * 100));
+  renderDrafts();
 
   form.addEventListener("submit", submitListing);
   form.addEventListener("input", sync);
   form.addEventListener("change", sync);
-  document.querySelector("#draft-restore").addEventListener("click", (event) => {
+  document.querySelector("#draft-toggle").addEventListener("click", (event) => {
     event.preventDefault();
-    applyDraft();
+    const panel = document.querySelector("#drafts");
+    panel.hidden = !panel.hidden;
+    if (!panel.hidden) panel.scrollIntoView({ block: "nearest" });
   });
   document.querySelector("#draft-clear").addEventListener("click", (event) => {
     event.preventDefault();
@@ -208,7 +281,7 @@ async function main() {
     done.hidden = true;
     form.hidden = false;
     document.querySelector("#preview-badge").hidden = true;
-    clearDraft();
+    applyDraft(0); // 続けて出品するときは 1 件目の下書きから始める
   });
   for (const slot of document.querySelectorAll(".photo.add")) {
     slot.addEventListener("click", () => {
@@ -220,7 +293,7 @@ async function main() {
     });
   }
 
-  applyDraft();
+  applyDraft(0);
 }
 
 main();
