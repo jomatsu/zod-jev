@@ -371,6 +371,19 @@ a:hover {
   background: #b9c0cf;
 }
 
+.demo-status.checked {
+  background: #26334a;
+  color: #bcd4ff;
+}
+
+.demo-table tr.demo-skipped td {
+  opacity: 0.45;
+}
+
+.demo-mark.off {
+  color: #5b6376;
+}
+
 .demo-metrics {
   font-family: ui-monospace, Menlo, monospace;
 }

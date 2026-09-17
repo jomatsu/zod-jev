@@ -151,6 +151,68 @@ describe("出品画面の裏側（listing service）", () => {
     expect(saved!.jev.questions).toBeNull();
   });
 
+  it("途中チェックは必要なフィールドが揃った条件だけを聞き、記録は残さない", async () => {
+    const { recorder, service } = setup(answering());
+
+    // 説明だけ入力した状態（カテゴリー・状態・価格は未入力）
+    const result = await service.precheck({ title: draft.title, body: draft.body });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    // 聞く条件は body / title だけで足りる 3 つ。answers に入る質問数もそれに一致する
+    const outcomes = Object.fromEntries(result.judgment.rules.map((r) => [r.ruleId, r.outcome]));
+    expect(outcomes).toEqual({
+      no_prohibited_items: "ok",
+      no_contact_or_external: "ok",
+      category_matches_item: "skipped",
+      condition_matches_description: "skipped",
+      price_is_plausible: "skipped",
+      description_is_sufficient: "ok",
+    });
+    expect(Object.keys(recorder.calls[0]!.body.questions)).toHaveLength(3);
+    expect(result.judgment.origin).toBe("precheck");
+    expect(result.judgment.status).toBe("checked");
+
+    // 保存はしない（/ops の一覧は増えない）
+    expect(await service.list()).toEqual([]);
+  });
+
+  it("途中チェックは未入力のフィールドで落ちた形のエラーも返す", async () => {
+    const { recorder, service } = setup(answering());
+
+    const result = await service.precheck({ title: draft.title, body: "短い" });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.fieldErrors.body).toEqual(["商品の説明は10文字以上で入力してください"]);
+    expect(recorder.calls).toHaveLength(0); // 形が足りないので JEV は呼ばない
+  });
+
+  it("何も入力していなければ JEV を呼ばない", async () => {
+    const { recorder, service } = setup(answering());
+
+    const result = await service.precheck({});
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.judgment.rules.every((rule) => rule.outcome === "skipped")).toBe(true);
+    expect(result.judgment.jev.questionCount).toBe(0);
+    expect(recorder.calls).toHaveLength(0);
+  });
+
+  it("途中チェックでも違反は該当フィールド付きで返る（インライン表示用）", async () => {
+    const { service } = setup(answering({ [rule("no_contact_or_external")]: 0.02 }));
+
+    const result = await service.precheck({ title: draft.title, body: draft.body });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const failed = result.judgment.rules.find((r) => r.ruleId === "no_contact_or_external");
+    expect(failed).toMatchObject({ field: "body", outcome: "rejected", probability: 0.02 });
+    expect(failed!.message).toContain("連絡先や外部サイトの記載はできません");
+  });
+
   it("記録は上限までで古いものから捨てる", async () => {
     let n = 0;
     const service = createListingService({

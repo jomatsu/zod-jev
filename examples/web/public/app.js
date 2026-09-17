@@ -30,6 +30,7 @@ const STATUS_LABEL = {
   review: "審査中",
   rejected: "出品不可",
   invalid: "形式エラー",
+  checked: "確認中",
 };
 
 const yen = (value) => `¥${value.toLocaleString("ja-JP")}`;
@@ -182,58 +183,82 @@ function renderSamples() {
   );
 }
 
-/** 直前の出品を裏側から見た結果。 */
-function renderJudgment(record) {
+/** 直前の判定（出品時 or フォーカスを外した時）を裏側から見た結果。 */
+function renderJudgment(demo) {
   const box = document.querySelector("#demo-result");
-  if (record === null || record === undefined) {
+  if (demo === null || demo === undefined) {
     box.replaceChildren(
-      el("p", "demo-muted", "まだ出品していません。左の「出品する」を押してください。"),
+      el("p", "demo-muted", "まだ判定していません。入力してフォーカスを外すか、出品してください。"),
     );
     return;
   }
 
   const head = el("div", "demo-result-head");
-  head.append(el("span", `demo-status ${record.status}`, STATUS_LABEL[record.status] ?? record.status));
-  head.append(el("span", "demo-muted", record.id));
+  head.append(
+    el("span", `demo-status ${demo.status}`, STATUS_LABEL[demo.status] ?? demo.status),
+  );
+  head.append(
+    el(
+      "span",
+      "demo-muted",
+      demo.origin === "precheck"
+        ? "フォーカスを外した時点（まだ出品していません）"
+        : (demo.id ?? ""),
+    ),
+  );
   box.replaceChildren(head);
-
-  const kinds = new Map();
-  for (const issue of record.issues) {
-    if (issue.details.ruleId !== undefined) kinds.set(issue.details.ruleId, issue.details.kind);
-  }
-  const answers = record.jev.answers ?? {};
-  const questionKeys = Object.keys(record.jev.questions ?? {});
 
   const table = el("table", "demo-table");
   const tbody = el("tbody");
-  meta.rules.forEach((rule, index) => {
-    const probability = answers[questionKeys[index]]?.noul;
-    const kind = kinds.get(rule.id);
-    const row = el("tr");
-
-    const mark = el("td", "demo-mark", kind === "rejected" ? "✗" : kind === "uncertain" ? "▲" : "✓");
-    mark.classList.add(kind === "rejected" ? "bad" : kind === "uncertain" ? "warn" : "ok");
+  for (const rule of demo.rules) {
+    const row = el("tr", rule.outcome === "skipped" ? "demo-skipped" : undefined);
+    const mark = el(
+      "td",
+      "demo-mark",
+      rule.outcome === "rejected"
+        ? "✗"
+        : rule.outcome === "uncertain"
+          ? "▲"
+          : rule.outcome === "unavailable"
+            ? "!"
+            : rule.outcome === "skipped"
+              ? "·"
+              : "✓",
+    );
+    mark.classList.add(
+      rule.outcome === "rejected" || rule.outcome === "unavailable"
+        ? "bad"
+        : rule.outcome === "uncertain"
+          ? "warn"
+          : rule.outcome === "skipped"
+            ? "off"
+            : "ok",
+    );
     row.append(mark);
-    row.append(el("td", "demo-rule", rule.id));
+    row.append(el("td", "demo-rule", rule.ruleId));
 
     const value = el("td", "demo-prob");
-    value.textContent = probability === undefined ? "—" : probability.toFixed(2);
+    value.textContent = rule.probability === null ? "—" : rule.probability.toFixed(2);
     row.append(value);
 
     const cell = el("td", "demo-bar-cell");
-    const track = el("div", "demo-bar");
-    const fill = el("div", `demo-bar-fill ${kind === "rejected" ? "bad" : kind === "uncertain" ? "warn" : "ok"}`);
-    fill.style.width = `${Math.round((probability ?? 0) * 100)}%`;
-    track.append(fill);
-    const threshold = el("div", "demo-bar-threshold");
-    threshold.style.left = `${(rule.threshold * 100).toFixed(1)}%`;
-    threshold.title = `合格の閾値: ${rule.threshold.toFixed(2)}`;
-    track.append(threshold);
-    cell.append(track);
+    if (rule.probability !== null) {
+      const track = el("div", "demo-bar");
+      const fill = el(
+        "div",
+        `demo-bar-fill ${rule.outcome === "rejected" ? "bad" : rule.outcome === "uncertain" ? "warn" : "ok"}`,
+      );
+      fill.style.width = `${Math.round(rule.probability * 100)}%`;
+      track.append(fill);
+      const threshold = el("div", "demo-bar-threshold");
+      threshold.style.left = `${(rule.threshold * 100).toFixed(1)}%`;
+      threshold.title = `合格の閾値: ${rule.threshold.toFixed(2)}`;
+      track.append(threshold);
+      cell.append(track);
+    }
     row.append(cell);
-
     tbody.append(row);
-  });
+  }
   table.append(tbody);
   box.append(table);
 
@@ -242,29 +267,110 @@ function renderJudgment(record) {
       "p",
       "demo-muted demo-metrics",
       [
-        `model=${record.jev.model ?? "-"}`,
-        `questions=${record.jev.questionCount}`,
-        `tokens=${record.jev.inputTokens}`,
-        `${record.jev.latencyMs}ms`,
+        `model=${demo.jev.model ?? "-"}`,
+        `questions=${demo.jev.questionCount}`,
+        `tokens=${demo.jev.inputTokens}`,
+        `${demo.jev.latencyMs}ms`,
       ].join(" / "),
     ),
   );
-  box.append(
-    el(
-      "p",
-      "demo-verdict",
-      record.status === "rejected"
+
+  const verdict =
+    demo.origin === "precheck"
+      ? demo.rules.some((rule) => rule.outcome === "rejected")
+        ? "→ このままでは出品できません（該当項目に理由が出ています）"
+        : "→ ここまでは問題なし。出品するまで結果は確定しません"
+      : demo.status === "rejected"
         ? "→ 出品不可（理由は該当項目の下に出る）"
-        : record.status === "review"
+        : demo.status === "review"
           ? "→ 審査中（利用者には「審査が終わり次第公開」とだけ出る）"
-          : "→ 公開中（全条件が成立）",
-    ),
-  );
+          : "→ 公開中（全条件が成立）";
+  box.append(el("p", "demo-verdict", verdict));
 }
 
 /* ---------------------------------------------------------------------------
    送信
    --------------------------------------------------------------------------- */
+
+/** 途中チェック（フォーカスを外したとき）の制御。 */
+let checkTimer;
+let checking = false;
+let lastChecked = "";
+
+function formPayload() {
+  return {
+    title: form.title.value,
+    body: form.body.value,
+    category: form.category.value,
+    condition: form.condition.value,
+    shippingFee: form.shippingFee.value,
+    shippingDays: form.shippingDays.value,
+    price: form.price.value,
+  };
+}
+
+const isEmptyPayload = (payload) =>
+  payload.title === "" &&
+  payload.body === "" &&
+  payload.category === "" &&
+  payload.condition === "" &&
+  payload.price === "";
+
+/** 該当フィールドのインラインに出す（全体のバナーは出さない＝まだ出品していないため）。 */
+function showInline(messages) {
+  for (const { field, message } of messages) {
+    const node = document.querySelector(`#err-${field}`);
+    if (node) node.textContent = message;
+  }
+}
+
+function scheduleCheck() {
+  if (form.hidden) return; // 完了画面を出しているときは何もしない
+  clearTimeout(checkTimer);
+  checkTimer = setTimeout(runCheck, 400); // 連続でフォーカスが移るのをまとめる
+}
+
+async function runCheck() {
+  if (checking) return;
+  const payload = formPayload();
+  if (isEmptyPayload(payload)) return;
+  const key = JSON.stringify(payload);
+  if (key === lastChecked) return; // 同じ内容なら再判定しない
+
+  checking = true;
+  try {
+    const response = await fetch("/api/listings/check", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: key,
+    });
+    const data = await response.json();
+    lastChecked = key;
+    clearErrors();
+
+    if (data.ok === false) {
+      // 形のエラー（文字数など）はその場で出す
+      for (const [field, messages] of Object.entries(data.fieldErrors ?? {})) {
+        showInline([{ field, message: messages.join(" ") }]);
+      }
+      return;
+    }
+
+    renderJudgment(data.judgment);
+    if (meta.mode === "enforce") {
+      // 意味の違反も、フォーカスを外した時点で該当項目の下に出す
+      showInline(
+        data.judgment.rules
+          .filter((rule) => rule.outcome === "rejected" && rule.field !== null)
+          .map((rule) => ({ field: rule.field, message: rule.message })),
+      );
+    }
+  } catch {
+    // 途中チェックの失敗は黙って無視する（出品時にあらためて判定される）
+  } finally {
+    checking = false;
+  }
+}
 
 async function submitListing(event) {
   event.preventDefault();
@@ -276,19 +382,12 @@ async function submitListing(event) {
     const response = await fetch("/api/listings", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        title: form.title.value,
-        body: form.body.value,
-        category: form.category.value,
-        condition: form.condition.value,
-        shippingFee: form.shippingFee.value,
-        shippingDays: form.shippingDays.value,
-        price: form.price.value,
-      }),
+      body: JSON.stringify(formPayload()),
     });
     const data = await response.json();
 
     // デモ操作パネルに裏側の判定を出す（本番の API はこの情報を返さない）
+    lastChecked = JSON.stringify(formPayload());
     renderJudgment(data.demo ?? null);
 
     if (response.status === 422) {
@@ -340,6 +439,9 @@ async function main() {
   form.addEventListener("submit", submitListing);
   form.addEventListener("input", sync);
   form.addEventListener("change", sync);
+  // フォーカスを外したときに判定する（出品ボタンを押すのを待たない）
+  form.addEventListener("focusout", scheduleCheck);
+  form.addEventListener("change", scheduleCheck);
   document.querySelector("#draft-clear").addEventListener("click", (event) => {
     event.preventDefault();
     clearDraft();

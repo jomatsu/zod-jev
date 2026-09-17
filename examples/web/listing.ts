@@ -144,6 +144,56 @@ export type ListingMode = "off" | "shadow" | "enforce";
 export type ListingStatus = "published" | "review" | "rejected" | "invalid";
 
 /** 運用画面（/ops）で見える 1 件分の記録。 */
+/**
+ * 条件ごとに、判定に必要なフィールド。
+ * 途中チェック（フォーカスを外した時）は、これが揃っている条件だけを JEV に聞く。
+ */
+export const RULE_FIELDS: Readonly<Record<string, readonly (keyof Listing)[]>> = {
+  no_prohibited_items: ["title", "body"],
+  no_contact_or_external: ["body"],
+  category_matches_item: ["category", "title", "body"],
+  condition_matches_description: ["condition", "body"],
+  price_is_plausible: ["price", "title", "body"],
+  description_is_sufficient: ["body"],
+};
+
+/** 1 条件の結果（確率はデモ表示用。判定そのものは issues が正）。 */
+export type RuleOutcome = "ok" | "rejected" | "uncertain" | "unavailable" | "skipped";
+
+export interface RuleResult {
+  readonly ruleId: string;
+  /** 違反を表示する場所（フォームのフィールド名）。無ければ null */
+  readonly field: string | null;
+  /** 表示用の文言（rejected は違反メッセージ、uncertain は確認メッセージ） */
+  readonly message: string;
+  /** 聞いていない条件は null */
+  readonly probability: number | null;
+  readonly threshold: number;
+  readonly outcome: RuleOutcome;
+}
+
+/**
+ * デモ操作パネルが描画する判定ビュー。
+ * 出品時（submit）も途中チェック（precheck）も同じ形にして、画面側の分岐を減らす。
+ */
+export interface JudgmentView {
+  readonly origin: "precheck" | "submit";
+  /** precheck は "checked"。submit は published / review / rejected */
+  readonly status: ListingStatus | "checked";
+  readonly id: string | null;
+  readonly rules: readonly RuleResult[];
+  readonly jev: {
+    readonly model: string | null;
+    readonly inputTokens: number;
+    readonly outputTokens: number;
+    readonly latencyMs: number;
+    readonly questionCount: number;
+    readonly state: unknown;
+    readonly questions: unknown;
+    readonly answers: unknown;
+  };
+}
+
 export interface ListingRecord {
   readonly id: string;
   readonly at: string;
@@ -169,8 +219,10 @@ export type SubmitResult =
       readonly ok: true;
       readonly id: string;
       readonly status: "published" | "review";
-      /** 裏側の判定内容（デモの操作パネルと /ops 用。本番の API では返さないこと） */
+      /** 保存した記録（/ops 用。本番の API では返さないこと） */
       readonly record: ListingRecord;
+      /** デモ操作パネル用の判定ビュー */
+      readonly judgment: JudgmentView;
     }
   | {
       readonly ok: false;
@@ -180,6 +232,16 @@ export type SubmitResult =
       readonly formErrors: readonly string[];
       /** 形式エラーのときは判定していないので undefined */
       readonly record?: ListingRecord;
+      readonly judgment?: JudgmentView;
+    };
+
+/** フォーカスを外したときの途中チェックの結果（保存しない）。 */
+export type PrecheckResult =
+  | { readonly ok: true; readonly judgment: JudgmentView }
+  | {
+      readonly ok: false;
+      readonly fieldErrors: Readonly<Record<string, readonly string[]>>;
+      readonly formErrors: readonly string[];
     };
 
 /**
@@ -254,7 +316,7 @@ export function createListingService(deps: ListingServiceDeps) {
   };
 
   // 形と意味は 1 か所で組み立てる。mode: off（キルスイッチ）では JEV のクライアントを作らない。
-  const semantic =
+  const jev =
     deps.mode === "off"
       ? undefined
       : createJevZod({
@@ -264,17 +326,99 @@ export function createListingService(deps: ListingServiceDeps) {
             const capture = captures.getStore();
             if (capture !== undefined) capture.metrics = info;
           },
-        }).semantic(ListingShape, ListingRules, {
-          context: ListingContext,
-          // 写真は判定に使わないので state に載せない（無駄なトークンを使わない）
-          toJSON: (listing) => ({
-            title: listing.title,
-            body: listing.body,
-            category: listing.category,
-            condition: listing.condition,
-            price: listing.price,
-          }),
         });
+
+  /** 写真は判定に使わないので state に載せない（無駄なトークンを使わない）。 */
+  const toJSON = (listing: Partial<Listing>) => ({
+    ...(listing.title === undefined ? {} : { title: listing.title }),
+    ...(listing.body === undefined ? {} : { body: listing.body }),
+    ...(listing.category === undefined ? {} : { category: listing.category }),
+    ...(listing.condition === undefined ? {} : { condition: listing.condition }),
+    ...(listing.price === undefined ? {} : { price: listing.price }),
+  });
+
+  const semantic = jev?.semantic(ListingShape, ListingRules, {
+    context: ListingContext,
+    toJSON,
+  });
+
+  /** 途中チェックで聞く条件（必要なフィールドが埋まっているものだけ）。 */
+  function applicableRules(partial: Partial<Listing>): SemanticRule[] {
+    return ListingRules.filter((rule) => {
+      const fields = RULE_FIELDS[rule.id] ?? [];
+      return fields.every((field) => {
+        const value = partial[field];
+        return value !== undefined && value !== null && value !== "";
+      });
+    });
+  }
+
+  /** デモ操作パネル用のビュー（聞いた条件は確率つき、聞いていない条件は skipped）。 */
+  function buildJudgment(
+    origin: JudgmentView["origin"],
+    status: JudgmentView["status"],
+    id: string | null,
+    asked: readonly SemanticRule[],
+    issues: readonly SemanticIssue[],
+    capture: Capture,
+  ): JudgmentView {
+    const kinds = new Map<string, RuleOutcome>();
+    let unavailable = false;
+    for (const issue of issues) {
+      if (issue.details.kind === "unavailable") {
+        // 通信・応答の失敗は条件を特定できないので、聞いた条件すべてを unavailable にする
+        unavailable = true;
+        continue;
+      }
+      kinds.set(issue.details.ruleId, issue.details.kind);
+    }
+    const answers = (capture.response?.answers ?? {}) as Record<string, { noul?: unknown }>;
+
+    const rules: RuleResult[] = ListingRules.map((rule) => {
+      const field = typeof rule.path?.[0] === "string" ? rule.path[0] : null;
+      const index = asked.findIndex((candidate) => candidate.id === rule.id);
+      if (index < 0) {
+        return {
+          ruleId: rule.id,
+          field,
+          message: rule.message,
+          probability: null,
+          threshold: rule.threshold ?? 0.95,
+          outcome: "skipped",
+        };
+      }
+      const noul = answers[`q${index}`]?.noul;
+      const outcome = kinds.get(rule.id) ?? (unavailable ? "unavailable" : "ok");
+      return {
+        ruleId: rule.id,
+        field,
+        message:
+          outcome === "uncertain"
+            ? (rule.uncertainMessage ?? "判断が割れています。人が確認します。")
+            : rule.message,
+        probability: typeof noul === "number" ? noul : null,
+        threshold: rule.threshold ?? 0.95,
+        outcome,
+      };
+    });
+
+    return {
+      origin,
+      status,
+      id,
+      rules,
+      jev: {
+        model: capture.metrics?.model || capture.response?.model || null,
+        inputTokens: capture.metrics?.inputTokens ?? 0,
+        outputTokens: capture.metrics?.outputTokens ?? 0,
+        latencyMs: capture.metrics?.latencyMs ?? 0,
+        questionCount: capture.metrics?.questionCount ?? asked.length,
+        state: capture.request?.state ?? null,
+        questions: capture.request?.questions ?? null,
+        answers: capture.response?.answers ?? null,
+      },
+    };
+  }
 
   function buildRecord(
     status: ListingStatus,
@@ -343,7 +487,13 @@ export function createListingService(deps: ListingServiceDeps) {
         // 弾いた出品も運用画面には残す（どんな出品が差し戻されたかを見るため）
         const record = buildRecord("rejected", listing, issues, capture, id);
         await store.add(record);
-        return { ok: false, fieldErrors, formErrors, record };
+        return {
+          ok: false,
+          fieldErrors,
+          formErrors,
+          record,
+          judgment: buildJudgment("submit", "rejected", id, ListingRules, issues, capture),
+        };
       }
 
       // uncertain / unavailable は受け付けて「審査中」。shadow / off は記録だけで「公開中」。
@@ -351,7 +501,47 @@ export function createListingService(deps: ListingServiceDeps) {
         deps.mode === "enforce" && issues.length > 0 ? "review" : "published";
       const record = buildRecord(status, listing, issues, capture, id);
       await store.add(record);
-      return { ok: true, id, status, record };
+      return {
+        ok: true,
+        id,
+        status,
+        record,
+        judgment: buildJudgment("submit", status, id, ListingRules, issues, capture),
+      };
+    },
+
+    /**
+     * フォーカスを外したときの途中チェック。保存はせず、判定だけを返す。
+     * 形が足りない条件は JEV に聞かない（未入力の値について無駄な判断をさせないため）。
+     */
+    async precheck(raw: unknown): Promise<PrecheckResult> {
+      const shape = ListingShape.partial().safeParse(raw);
+      if (!shape.success) {
+        const fieldErrors: Record<string, string[]> = {};
+        for (const issue of shape.error.issues) {
+          const field = typeof issue.path[0] === "string" ? issue.path[0] : "_form";
+          (fieldErrors[field] ??= []).push(issue.message);
+        }
+        return { ok: false, fieldErrors, formErrors: [] };
+      }
+
+      const capture: Capture = { request: null, response: null, metrics: null };
+      const asked = applicableRules(shape.data);
+      let issues: readonly SemanticIssue[] = [];
+
+      if (jev !== undefined && asked.length > 0) {
+        // 聞く条件だけのスキーマを組み立てる（作り直しは設定だけなので I/O は無い）
+        const schema = jev.semantic(ListingShape.partial(), asked, {
+          context: ListingContext,
+          toJSON,
+        });
+        await captures.run(capture, async () => {
+          const result = await schema.safeParseAsync(raw);
+          if (!result.success) issues = getSemanticIssues(result.error);
+        });
+      }
+
+      return { ok: true, judgment: buildJudgment("precheck", "checked", null, asked, issues, capture) };
     },
 
     /** 運用画面用。新しい順。 */

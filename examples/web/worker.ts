@@ -138,9 +138,17 @@ export default {
       if (url.pathname === "/api/listings" && request.method === "POST") {
         const { service } = getService(env);
         const input = await request.json().catch(() => null);
-        const { record, ...result } = await service.submit(input);
+        const { record, judgment, ...result } = await service.submit(input);
+        void record; // 記録は /ops 側で使う。API では返さない
         // demo はデモ操作パネル用の裏側の判定内容。本番の API では返さないこと。
-        return json({ ...result, demo: record ?? null }, result.ok ? 201 : 422);
+        return json({ ...result, demo: judgment ?? null }, result.ok ? 201 : 422);
+      }
+
+      if (url.pathname === "/api/listings/check" && request.method === "POST") {
+        // フォーカスを外したときの途中チェック（保存しない）
+        const { service } = getService(env);
+        const input = await request.json().catch(() => null);
+        return json(await service.precheck(input));
       }
 
       if (url.pathname === "/api/listings" && request.method === "GET") {
