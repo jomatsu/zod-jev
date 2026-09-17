@@ -1,8 +1,8 @@
 /**
- * zod-jev — Zod 4 のスキーマに TypeSafe JEV (System One) の意味検証を合成する。
+ * zod-jev — Zod 4 のスキーマに TypeSafe Jev (System One) の意味検証を合成する。
  *
  * 形式（型・必須・フォーマット）は Zod が、意味（「個人情報が含まれていない」など）は
- * JEV の noul 質問が担当する。1回の parse につき JEV を1回だけ呼ぶ。
+ * Jev の noul 質問が担当する。1回の parse につき Jev を1回だけ呼ぶ。
  */
 export { createJevZod } from "./semantic.js";
 export type { JevZod } from "./semantic.js";

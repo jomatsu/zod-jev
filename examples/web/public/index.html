@@ -9,12 +9,21 @@
   <body>
     <!-- ここから下は「デモ操作パネル」。フリマアプリ風の画面（.app-frame）の一部ではありません。 -->
     <aside class="demo-console" id="demo-console">
+      <!-- モバイルではこのバーだけが見えて、タップするとシートが開く -->
+      <button class="demo-sheet-bar" id="demo-toggle" type="button" aria-expanded="false" aria-controls="demo-body">
+        <span class="demo-badge">DEMO</span>
+        <span class="demo-sheet-title">デモ操作パネル</span>
+        <span class="demo-sheet-status" id="demo-sheet-status">入力例と判定結果</span>
+        <span class="demo-sheet-caret" aria-hidden="true">▲</span>
+      </button>
+
+      <div class="demo-inner" id="demo-body">
       <div class="demo-head">
         <span class="demo-badge">DEMO</span>
         <strong>デモ操作パネル</strong>
       </div>
       <p class="demo-note">
-        左側はフリマアプリの出品画面です（JEV の存在は見えません）。<strong>このパネルはアプリ本体の画面ではありません。</strong>
+        出品画面はフリマアプリ風のUIで、Jev の存在は画面に出ません。<strong>このパネルはアプリ本体の画面ではありません。</strong>
         入力例を選んで出品すると、出品が却下される挙動や裏側の判定結果を確認できます。
       </p>
 
@@ -27,7 +36,7 @@
       <section class="demo-section">
         <h3>2. 直前の出品判定（裏側）</h3>
         <div id="demo-result">
-          <p class="demo-muted">まだ出品されていません。左の「出品する」を押してください。</p>
+          <p class="demo-muted">まだ出品されていません。「出品する」を押すか、入力欄からフォーカスを外してください。</p>
         </div>
       </section>
 
@@ -38,6 +47,7 @@
           <span id="demo-mode"></span>
         </p>
       </section>
+      </div>
     </aside>
 
     <div class="app-frame">

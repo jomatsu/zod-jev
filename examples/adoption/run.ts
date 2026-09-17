@@ -1,7 +1,7 @@
 /**
  * 導入の実例を走らせる。
  *
- *   npx tsx examples/adoption/run.ts          # JEV を模した偽 fetch（鍵不要・課金なし）
+ *   npx tsx examples/adoption/run.ts          # Jev を模した偽 fetch（鍵不要・課金なし）
  *   npx tsx examples/adoption/run.ts --live   # 実 API（TYPESAFE_API_KEY / .env が必要）
  *
  * 同じ入力を「off（導入前）→ shadow（観測だけ）→ enforce（本番）」で流し、
@@ -52,7 +52,7 @@ const scenarios: readonly Scenario[] = [
     fake: { 具体的な依頼内容: 0.7 },
   },
   {
-    name: "形が壊れている（JEV は呼ばれない）",
+    name: "形が壊れている（Jev は呼ばれない）",
     input: { subject: "", body: "" },
     fake: {},
   },
@@ -78,7 +78,7 @@ function summarize(result: IntakeResult): string {
   }
 }
 
-/** JEV の代わりに、条件ごとの固定確率を返す偽 fetch（ユニットテストと同じ手口）。 */
+/** Jev の代わりに、条件ごとの固定確率を返す偽 fetch（ユニットテストと同じ手口）。 */
 function fakeFetch(probabilities: Record<string, number>) {
   return async (_url: string, init?: RequestInit): Promise<Response> => {
     const body = JSON.parse(String(init?.body ?? "{}")) as {
@@ -127,7 +127,7 @@ for (const scenario of scenarios) {
     const outcome = await runScenario(mode, scenario);
     console.log(
       `  ${mode.padEnd(7)} ${outcome.text}` +
-        `  [JEV呼び出し=${outcome.calls} tokens=${outcome.tokens} ${outcome.ms}ms]`,
+        `  [Jev呼び出し=${outcome.calls} tokens=${outcome.tokens} ${outcome.ms}ms]`,
     );
   }
   console.log();

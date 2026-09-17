@@ -1,5 +1,5 @@
 /**
- * 「普通の toC 画面」の裏側で JEV が判定する例（ドメイン層）: フリマアプリの出品。
+ * 「普通の toC 画面」の裏側で Jev が判定する例（ドメイン層）: フリマアプリの出品。
  *
  * 利用者に見えるのは出品フォームと、普通の結果表示だけ:
  *   「出品が完了しました」 / 「審査中です」 / 「出品できません（理由は該当項目の下）」
@@ -122,7 +122,7 @@ export const ListingRules: readonly SemanticRule[] = [
   },
 ];
 
-/** JEV に渡す参考情報。条件そのものではなく、判断の前提になる資料。 */
+/** Jev に渡す参考情報。条件そのものではなく、判断の前提になる資料。 */
 export const ListingContext: JevJson = {
   guidelines: [
     "医薬品・市販薬・医療機器、模倣品、現金・ギフトカード番号、アカウントや権利の譲渡、生き物、武器、他人の個人情報は出品できない。",
@@ -146,7 +146,7 @@ export type ListingStatus = "published" | "review" | "rejected" | "invalid";
 /** 運用画面（/ops）で見える 1 件分の記録。 */
 /**
  * 条件ごとに、判定に必要なフィールド。
- * 途中チェック（フォーカスを外した時）は、これが揃っている条件だけを JEV に聞く。
+ * 途中チェック（フォーカスを外した時）は、これが揃っている条件だけを Jev に聞く。
  */
 export const RULE_FIELDS: Readonly<Record<string, readonly (keyof Listing)[]>> = {
   no_prohibited_items: ["title", "body"],
@@ -315,7 +315,7 @@ export function createListingService(deps: ListingServiceDeps) {
     return response;
   };
 
-  // 形と意味は 1 か所で組み立てる。mode: off（キルスイッチ）では JEV のクライアントを作らない。
+  // 形と意味は 1 か所で組み立てる。mode: off（キルスイッチ）では Jev のクライアントを作らない。
   const jev =
     deps.mode === "off"
       ? undefined
@@ -449,7 +449,7 @@ export function createListingService(deps: ListingServiceDeps) {
 
   return {
     async submit(raw: unknown): Promise<SubmitResult> {
-      // (1) 形: 同期。ここで落ちる入力では JEV を呼ばない。
+      // (1) 形: 同期。ここで落ちる入力では Jev を呼ばない。
       const shape = ListingShape.safeParse(raw);
       if (!shape.success) {
         const fieldErrors: Record<string, string[]> = {};
@@ -512,7 +512,7 @@ export function createListingService(deps: ListingServiceDeps) {
 
     /**
      * フォーカスを外したときの途中チェック。保存はせず、判定だけを返す。
-     * 形が足りない条件は JEV に聞かない（未入力の値について無駄な判断をさせないため）。
+     * 形が足りない条件は Jev に聞かない（未入力の値について無駄な判断をさせないため）。
      */
     async precheck(raw: unknown): Promise<PrecheckResult> {
       // 空欄は「まだ入力していない」として扱う（空文字を数値化すると不正値になってしまうため）

@@ -1,7 +1,7 @@
 {
   "name": "zod-jev",
   "version": "0.1.0",
-  "description": "Zod 4 に TypeSafe JEV (System One) の意味検証を合成する。形式は Zod、意味は JEV の noul 質問で検証する。",
+  "description": "Zod 4 に TypeSafe Jev (System One) の意味検証を合成する。形式は Zod、意味は Jev の noul 質問で検証する。",
   "license": "MIT",
   "author": "jomatsu",
   "repository": {

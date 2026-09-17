@@ -1,5 +1,5 @@
 /**
- * 実際の TypeSafe JEV に対して動くことを確かめるテスト。
+ * 実際の TypeSafe Jev に対して動くことを確かめるテスト。
  *
  * - 実行には `TYPESAFE_API_KEY`（または `.env`）が必要。
  * - 課金が発生する（1リクエストあたり $0.0001 未満）。`npm run test:integration` で明示的に走らせる。
@@ -11,7 +11,7 @@ import { AuthenticationError, createJevZod, getSemanticIssues } from "../../src/
 const apiKey = process.env.TYPESAFE_API_KEY;
 const describeIfKey = apiKey === undefined || apiKey === "" ? describe.skip : describe;
 
-describeIfKey("実 API（TypeSafe JEV）", () => {
+describeIfKey("実 API（TypeSafe Jev）", () => {
   it("条件をまとめて1リクエストで判定し、成立しない条件だけを落とす", async () => {
     const onResponse = vi.fn();
     const z = createJevZod({ apiKey, onResponse, retry: { backoffInitialMs: 0 } });

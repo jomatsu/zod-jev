@@ -1,7 +1,7 @@
 import type { JevMessages } from "./types.js";
 
 /**
- * 既定メッセージ。表示言語は日本語、JEV に送る `instructions` は英語にしてある
+ * 既定メッセージ。表示言語は日本語、Jev に送る `instructions` は英語にしてある
  * （モデル向けの指示と、開発者・利用者が読むメッセージを分けている）。
  */
 export const defaultMessages: JevMessages = {

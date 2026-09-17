@@ -3,14 +3,14 @@
 [![npm](https://img.shields.io/npm/v/zod-jev.svg)](https://www.npmjs.com/package/zod-jev)
 [![license](https://img.shields.io/npm/l/zod-jev.svg)](./LICENSE)
 
-**Zod validates the shape. [JEV](https://typesafe.ai/) validates the meaning.**
+**Zod validates the shape. [Jev](https://typesafe.ai/) validates the meaning.**
 
-`zod-jev` composes TypeSafe [JEV](https://typesafe.ai/) (System One) semantic checks into
+`zod-jev` composes TypeSafe [Jev](https://typesafe.ai/) (System One) semantic checks into
 [Zod](https://zod.dev) 4 schemas. Shape rules stay in Zod. Judgments that only a model can make
 ("does this body contain personal data?", "is this price plausible for this item?", "does the
 category match the description?") become calibrated probabilities that your code can threshold on.
 
-A single `parseAsync` call sends every rule of that schema to JEV in a **single request**, then turns
+A single `parseAsync` call sends every rule of that schema to Jev in a **single request**, then turns
 the probabilities into Zod issues. Callers continue to use ordinary Zod APIs and error objects.
 
 ```ts
@@ -47,7 +47,7 @@ if (!result.success) {
 
 - **No new schema dialect.** `semantic()` returns the *same* schema type as your base schema with an
   extra async check. Methods such as `.extend()`, `.strict()`, and `z.toJSONSchema()` continue to work.
-- **One request per parse.** JEV answers all questions about the same state in parallel, so adding
+- **One request per parse.** Jev answers all questions about the same state in parallel, so adding
   rules barely changes latency (the official documentation calls this "speculative fan-out").
 - **Fail closed.** If zod-jev cannot obtain a judgment (`unavailable`), it reports an issue. It never
   silently treats an unavailable judgment as a pass.
@@ -64,7 +64,7 @@ if (!result.success) {
 Zod excels at checks that a grammar can decide: types, required fields, length, format, and enums.
 However, it cannot determine whether a free-text field is *acceptable*:
 
-| Check | Zod | zod-jev (JEV) |
+| Check | Zod | zod-jev (Jev) |
 | --- | --- | --- |
 | `body` is a string of 10–1000 chars | ✅ | |
 | `body` contains no personal data | | ✅ `p = 0.02` → reject |
@@ -72,7 +72,7 @@ However, it cannot determine whether a free-text field is *acceptable*:
 | The price is plausible for this item | | ✅ `p = 0.87` → not sure, ask a human |
 | The text asks for a refund | | ✅ (usually a `choice`/`score` job — see below) |
 
-JEV returns **probabilities, not prose**. You do not need prompt engineering to parse a string,
+Jev returns **probabilities, not prose**. You do not need prompt engineering to parse a string,
 and you do not need a "JSON mode" that might drift. Each decision provides a calibrated confidence
 value that you can threshold.
 
@@ -87,14 +87,14 @@ npm install zod-jev zod
 - A TypeSafe API key: create one at [console.typesafe.ai](https://console.typesafe.ai/), then run
   `export TYPESAFE_API_KEY=...`
 
-JEV is an early-access hosted model. TypeSafe bills requests by input tokens (at the time of writing,
+Jev is an early-access hosted model. TypeSafe bills requests by input tokens (at the time of writing,
 output tokens are counted but not charged). A validation with a handful of rules costs a fraction of
 a cent. See [Pricing and latency](#pricing-and-latency).
 
 ## How it works
 
 ```
-your value ──► Zod (shape)                     ──► JEV (meaning)                       ──► Zod issues
+your value ──► Zod (shape)                     ──► Jev (meaning)                       ──► Zod issues
                 types / required / format         noul questions, one request, parallel
 ```
 
@@ -117,7 +117,7 @@ the result (auto-reject versus human review) without re-parsing.
 
 ### Question keys are never sent to the model
 
-JEV uses your rule IDs only to match answers back to questions. The model sees only `instructions`
+Jev uses your rule IDs only to match answers back to questions. The model sees only `instructions`
 and `criteria`. Each rule must therefore stand on its own. By default, `zod-jev` sends:
 
 ```json
@@ -187,7 +187,7 @@ const Checked = z.semantic(base, rules, {
 | `path` | — | Issue path relative to this schema |
 | `threshold` | — | Per-rule threshold |
 | `uncertainMessage` | — | Message used for `uncertain` |
-| `instructions` | — | Replace the whole JEV `instructions` value (string, object, array) |
+| `instructions` | — | Replace the whole Jev `instructions` value (string, object, array) |
 | `criteria` | — | Replace the Noul `criteria.true` / `criteria.false` descriptions |
 
 ### `semanticArray(base, rules, options?)`
@@ -210,7 +210,7 @@ type SemanticIssue = {
 };
 ```
 
-`getSemanticIssues` separates JEV judgments from standard Zod issues so you can log or route them
+`getSemanticIssues` separates Jev judgments from standard Zod issues so you can log or route them
 separately.
 
 The package also exports: `DEFAULT_THRESHOLD`, `DEFAULT_MAX_STATE_CHARACTERS`,
@@ -256,7 +256,7 @@ Measured with `jev-1.13.0` (2026-09-17) using one request with several condition
   refinement for this field still runs because Zod does not notify child fields of parent failures.
   Parse the base shape first if you want to avoid the call.
 - **Server-side only.** The official SDK refuses to run in browsers. Never expose your API key to a web page.
-- **Not a text generator.** JEV returns typed decisions, not prose. For classifications or ordered
+- **Not a text generator.** Jev returns typed decisions, not prose. For classifications or ordered
   ratings, use the raw SDK's `choice` / `score` questions.
 
 ## Pricing and latency
@@ -265,7 +265,7 @@ Measured on the live API (`jev-1.13.0`, 6 conditions plus a guidelines context):
 
 - input ≈ **2,000 tokens ≈ $0.00008** per validation, latency **160–470 ms** (one request,
   independent of the number of rules)
-- JEV launch pricing is $42 per billion input tokens; output tokens are counted but not charged
+- Jev launch pricing is $42 per billion input tokens; output tokens are counted but not charged
 
 `onResponse` provides the model, token counts, latency, and question count for every request. The demo
 deployment records these values on its `/ops` page.
@@ -302,7 +302,7 @@ TYPESAFE_API_KEY=apikey_... npm run test:integration   # or put it in .env
 npm run check             # tsc + 78 unit tests + dual ESM/CJS build + dist smoke test
 npm run test:integration  # real API (a few requests)
 npm run demo              # minimal example
-npm run demo:web:fake     # the demo app with a fake JEV (no key, no billing)
+npm run demo:web:fake     # the demo app with a fake Jev (no key, no billing)
 npm run demo:web          # the demo app against the real API
 npm run deploy:web        # Cloudflare Workers deploy (see examples/web/README.md)
 ```
@@ -311,7 +311,7 @@ The build runs standard `tsc` twice (ESM and CJS) with per-directory `package.js
 
 ## Documentation
 
-- [docs/jev.md](https://github.com/jomatsu/zod-jev/blob/main/docs/jev.md) — JEV/System One API
+- [docs/jev.md](https://github.com/jomatsu/zod-jev/blob/main/docs/jev.md) — Jev/System One API
   reference, measured behavior, design rationale, and sources (Japanese)
 - [docs/adoption.md](https://github.com/jomatsu/zod-jev/blob/main/docs/adoption.md) — Migration guide
   for an existing Zod codebase, with a runnable example (Japanese)

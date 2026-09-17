@@ -31,7 +31,7 @@ export function parseConfig<T>(schema: Z.ZodType<T>, value: unknown, label: stri
 /** 検証済みの1条件。リクエストの組み立てと判定はこの形だけを見る。 */
 export interface Check {
   readonly id: string;
-  /** リクエスト内での質問キー。JEV はキーをモデルに送らないので、意味は instructions が持つ。 */
+  /** リクエスト内での質問キー。Jev はキーをモデルに送らないので、意味は instructions が持つ。 */
   readonly key: string;
   readonly is: string;
   readonly message: string;

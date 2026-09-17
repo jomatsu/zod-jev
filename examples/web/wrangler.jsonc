@@ -1,5 +1,5 @@
 {
-  // zod-jev のデモ（普通のフォーム + 裏で JEV）を Cloudflare Workers にデプロイする設定。
+  // zod-jev のデモ（普通のフォーム + 裏で Jev）を Cloudflare Workers にデプロイする設定。
   //
   //   npx wrangler deploy --config examples/web/wrangler.jsonc
   //   npx wrangler secret put TYPESAFE_API_KEY --config examples/web/wrangler.jsonc

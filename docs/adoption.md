@@ -4,19 +4,19 @@
 動作する実例は `examples/adoption/`（`intake.ts` + `run.ts`）にあり、以下のコマンドで確認できます。
 
 ```sh
-npx tsx examples/adoption/run.ts          # JEV を模した偽 fetch（鍵不要・課金なし）
+npx tsx examples/adoption/run.ts          # Jev を模した偽 fetch（鍵不要・課金なし）
 npx tsx examples/adoption/run.ts --live   # 実 API（TYPESAFE_API_KEY / .env が必要）
 ```
 
-## 0. どの判定を JEV に任せるか
+## 0. どの判定を Jev に任せるか
 
 | 判定の種類 | 担当 | 例 |
 | --- | --- | --- |
 | 形式・必須・桁数・列挙 | **Zod** | `email` の形式、`subject` が空でない、`status` が 3 値のどれか |
-| 意味の条件（確率が要る） | **JEV（このライブラリ）** | 個人情報が含まれていない、ポリシーに適合している、注入の疑いがない、内容が具体的 |
-| 分類・段階評価（値を取る） | **素の JEV**（`choice` / `score`） | 問い合わせ種別、深刻度 |
+| 意味の条件（確率が要る） | **Jev（このライブラリ）** | 個人情報が含まれていない、ポリシーに適合している、注入の疑いがない、内容が具体的 |
+| 分類・段階評価（値を取る） | **素の Jev**（`choice` / `score`） | 問い合わせ種別、深刻度 |
 
-JEV の `noul` は yes/no 専用です。「どの種別か」を条件として記述すると、種別が異なる入力がすべてエラーになります。分類値を取得したい場合は、素の SDK の `choice` を使用してください。
+Jev の `noul` は yes/no 専用です。「どの種別か」を条件として記述すると、種別が異なる入力がすべてエラーになります。分類値を取得したい場合は、素の SDK の `choice` を使用してください。
 
 ## 1. 接続を 1 か所に集める
 
@@ -64,12 +64,12 @@ export const z = createJevZod({
 ```
 
 - **形式のチェックは削除しません**。意味検証で失敗した場合でも、形式エラーは従来どおり同期処理で返却できます。
-- 形式が不正な入力に対しては JEV が呼び出されません（Zod が子の refine を実行しないため、課金も遅延も発生しません）。
+- 形式が不正な入力に対しては Jev が呼び出されません（Zod が子の refine を実行しないため、課金も遅延も発生しません）。
 - スキーマは同一の `TicketShape` から導出するため、形式と意味の定義が乖離しません。
 
 ## 3. まず shadow で流す（挙動を変えない）
 
-`mode: "shadow"` は JEV を呼び出しますが、結果を記録するのみでリクエストの扱いは変更しません。
+`mode: "shadow"` は Jev を呼び出しますが、結果を記録するのみでリクエストの扱いは変更しません。
 
 ```ts
 onIssues: (issues, ticket) => audit.insert({ issues, ticket, at: Date.now() })
@@ -96,7 +96,7 @@ onIssues: (issues, ticket) => audit.insert({ issues, ticket, at: Date.now() })
 | --- | --- | --- |
 | `rejected` | 422 / 400 で差し戻し（`issue.message` を利用者に見せる） | 条件が明確に成立していない |
 | `uncertain` | 受け付けて**人によるレビュー**に回す | 判断できなかっただけで、入力が悪いわけではない |
-| `unavailable` | 受け付けて記録 + アラート | JEV 障害でサービスを止めない（メトリクスとセットなら安全） |
+| `unavailable` | 受け付けて記録 + アラート | Jev 障害でサービスを止めない（メトリクスとセットなら安全） |
 | 形式エラー | 従来どおり（Zod） | 担当が違う |
 
 > ライブラリ単体は **fail-closed**（`unavailable` も issue として報告）です。上の表のような「可用性優先」のポリシーは、ライブラリの既定動作を変更するのではなく、**アプリ側の 2 段構えで表現**します。これが 2 章で形式と意味を分ける一番の理由です。
@@ -130,7 +130,7 @@ onIssues: (issues, ticket) => audit.insert({ issues, ticket, at: Date.now() })
 
 - **スキーマを丸ごと置き換えること**（`parse` → `parseAsync` の一括変更）。影響範囲が広すぎます。意味検証は「明示的に await する 1 段」として追加するのが安全です。
 - **ホットパスに直接組み込むこと**。遅延・課金・外部障害点が同時に増加します。
-- **分類・要約を「条件」として記述すること**。値が必要な場合は素の JEV の `choice` / `score` を使用してください。
+- **分類・要約を「条件」として記述すること**。値が必要な場合は素の Jev の `choice` / `score` を使用してください。
 - **`unavailable` を黙って通過させること**。fail-open にする場合はメトリクスとセットで運用してください。
 - **ユニットテストから実 API を呼び出すこと**。
 
@@ -147,8 +147,8 @@ onIssues: (issues, ticket) => audit.insert({ issues, ticket, at: Date.now() })
   shadow  accepted（shadow記録のみ）: no_instruction_override=0.01(rejected), self_service_ready=0.30(uncertain)
   enforce rejected: 本文にプロンプトインジェクションの疑いがあります。人が確認してください。
 
---- 形が壊れている（JEV は呼ばれない） ---
-  off/shadow/enforce  invalid: ...   [JEV呼び出し=0]
+--- 形が壊れている（Jev は呼ばれない） ---
+  off/shadow/enforce  invalid: ...   [Jev呼び出し=0]
 ```
 
 `npm run test:integration`（実 API）と `test/adoption.test.ts`（偽 fetch）で、この振る舞いを固定しています。

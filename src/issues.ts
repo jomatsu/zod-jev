@@ -36,7 +36,7 @@ function readDetails(params: unknown): SemanticIssueDetails | undefined {
 }
 
 /**
- * `safeParseAsync` の結果から、JEV の判定に由来する issue だけを取り出す。
+ * `safeParseAsync` の結果から、Jev の判定に由来する issue だけを取り出す。
  *
  * 形式エラー（Zod 自身の issue）と意味エラーを分けて扱いたいときに使う。
  * `unavailable` は「判定できなかった」であり、条件が成立したわけではない。

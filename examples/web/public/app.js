@@ -1,6 +1,6 @@
 // 出品画面（フリマアプリ風の部分）と、デモ操作パネル（メタUI）の両方を扱う。
 //
-// - フリマ風の画面（.app-frame の中）: 普通の出品フォーム。JEV の存在・確率・条件 ID は出さない
+// - フリマ風の画面（.app-frame の中）: 普通の出品フォーム。Jev の存在・確率・条件 ID は出さない
 // - デモ操作パネル（.demo-console）: 例を入れるボタンと、直前の出品を裏側から見た結果。
 //   アプリの一部ではないことが分かるように、見た目も文言も分けてある。
 const form = document.querySelector("#form");
@@ -147,6 +147,9 @@ function applyDraft(index) {
   document.querySelector("#draft-note").textContent =
     index === 0 ? "前回の下書きを復元しました" : "下書きを復元しました";
   setPhoto(draft.photo !== false);
+  // 新しい内容なので、また途中チェックできるようにする
+  suppressCheck = false;
+  lastChecked = "";
   clearErrors();
   sync();
 }
@@ -175,6 +178,7 @@ function renderSamples() {
       button.addEventListener("click", () => {
         showForm();
         applyDraft(index);
+        setSheet(false);
       });
       button.append(el("span", "demo-sample-name", draft.label));
       button.append(el("span", "demo-sample-item", draft.listing.title));
@@ -183,9 +187,36 @@ function renderSamples() {
   );
 }
 
+/* ---------------------------------------------------------------------------
+   デモ操作パネル（モバイルでは下から出るシート）。バーは常に見えている。
+   --------------------------------------------------------------------------- */
+const consoleEl = document.querySelector("#demo-console");
+const demoBar = document.querySelector("#demo-toggle");
+const demoBarStatus = document.querySelector("#demo-sheet-status");
+
+function setSheet(open) {
+  consoleEl.classList.toggle("open", open);
+  demoBar.setAttribute("aria-expanded", String(open));
+}
+
+/** シートのバーに、直前の判定の要約を出す。 */
+function updateBarStatus(demo) {
+  if (demo === null || demo === undefined) {
+    demoBarStatus.textContent = "入力例と判定結果";
+    demoBarStatus.className = "demo-sheet-status";
+    return;
+  }
+  const issueCount = demo.rules.filter((rule) => rule.outcome !== "ok" && rule.outcome !== "skipped").length;
+  const label = demo.origin === "precheck" ? "確認中（未出品）" : (STATUS_LABEL[demo.status] ?? demo.status);
+  demoBarStatus.textContent = issueCount > 0 ? `${label}・指摘 ${issueCount} 件` : label;
+  const alert = demo.status === "rejected" || demo.status === "invalid" || (demo.origin === "precheck" && issueCount > 0);
+  demoBarStatus.className = `demo-sheet-status${alert ? " alert" : issueCount > 0 ? " warn" : ""}`;
+}
+
 /** 直前の判定（出品時 or フォーカスを外した時）を裏側から見た結果。 */
 function renderJudgment(demo) {
   const box = document.querySelector("#demo-result");
+  updateBarStatus(demo);
   if (demo === null || demo === undefined) {
     box.replaceChildren(
       el("p", "demo-muted", "まだ判定結果がありません。入力してフォーカスを外すか、出品してください。"),
@@ -296,6 +327,8 @@ function renderJudgment(demo) {
 let checkTimer;
 let checking = false;
 let lastChecked = "";
+/** 出品した直後は途中チェックを止める（出品の結果を上書きしないため）。編集で解除する。 */
+let suppressCheck = false;
 
 function formPayload() {
   return {
@@ -330,7 +363,7 @@ function showInline(messages) {
 }
 
 function scheduleCheck() {
-  if (form.hidden) return; // 完了画面を出しているときは何もしない
+  if (form.hidden || suppressCheck) return; // 完了画面のとき・出品直後は何もしない
   clearTimeout(checkTimer);
   checkTimer = setTimeout(runCheck, 400); // 連続でフォーカスが移るのをまとめる
 }
@@ -343,6 +376,8 @@ async function runCheck() {
   if (key === lastChecked) return; // 同じ内容なら再判定しない
 
   checking = true;
+  // 送信前に記録して、連打や多重発火での再判定を防ぐ
+  lastChecked = key;
   try {
     const response = await fetch("/api/listings/check", {
       method: "POST",
@@ -350,7 +385,6 @@ async function runCheck() {
       body: key,
     });
     const data = await response.json();
-    lastChecked = key;
     clearErrors();
 
     if (data.ok === false) {
@@ -380,6 +414,9 @@ async function runCheck() {
 async function submitListing(event) {
   event.preventDefault();
   clearErrors();
+  setSheet(false);
+  suppressCheck = true; // 判定の結果は出品のものが最後に残るようにする
+  clearTimeout(checkTimer);
   submit.disabled = true;
   submit.textContent = "出品中…";
 
@@ -441,12 +478,23 @@ async function main() {
     : "現在は実 API に問い合わせています。";
   renderSamples();
 
+  demoBar.addEventListener("click", () => setSheet(!consoleEl.classList.contains("open")));
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") setSheet(false);
+  });
+
   form.addEventListener("submit", submitListing);
-  form.addEventListener("input", sync);
-  form.addEventListener("change", sync);
+  form.addEventListener("input", () => {
+    suppressCheck = false; // 編集したらまた途中チェックを有効にする
+    sync();
+  });
+  form.addEventListener("change", () => {
+    suppressCheck = false;
+    sync();
+    scheduleCheck();
+  });
   // フォーカスを外したときに判定する（出品ボタンを押すのを待たない）
   form.addEventListener("focusout", scheduleCheck);
-  form.addEventListener("change", scheduleCheck);
   document.querySelector("#draft-clear").addEventListener("click", (event) => {
     event.preventDefault();
     clearDraft();
@@ -455,6 +503,7 @@ async function main() {
     showForm();
     applyDraft(0);
     renderJudgment(null);
+    setSheet(false);
   });
   document.querySelector("#again").addEventListener("click", () => {
     showForm();

@@ -51,7 +51,7 @@ export interface Env {
   readonly TYPESAFE_API_KEY?: string;
   /** enforce（既定） / shadow / off。キルスイッチとして使える */
   readonly REVIEW_MODE?: string;
-  /** "1" にすると JEV を呼ばず、偽の判定で動く（課金なしで画面を確認する用） */
+  /** "1" にすると Jev を呼ばず、偽の判定で動く（課金なしで画面を確認する用） */
   readonly FAKE_JEV?: string;
 }
 

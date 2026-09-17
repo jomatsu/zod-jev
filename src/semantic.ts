@@ -19,7 +19,7 @@ const PositiveMs = Z.number().int().positive().max(2_147_483_647);
 const Model = Z.string().trim().min(1);
 const OnClientError = Z.enum(["throw", "issue"]);
 
-/** JEV の state と questions が共有する予算（約 32,000 トークン ≈ 150,000 文字）の既定値。 */
+/** Jev の state と questions が共有する予算（約 32,000 トークン ≈ 150,000 文字）の既定値。 */
 export const DEFAULT_MAX_STATE_CHARACTERS = 150_000;
 
 /** 既定の閾値。 */
@@ -87,7 +87,7 @@ function resolveConfig(config: JevZodConfig): Resolved {
 }
 
 /**
- * Zod 4 + TypeSafe JEV のスキーマビルダーを作る。
+ * Zod 4 + TypeSafe Jev のスキーマビルダーを作る。
  *
  * ```
  * const z = createJevZod({ apiKey: process.env.TYPESAFE_API_KEY });
@@ -97,7 +97,7 @@ function resolveConfig(config: JevZodConfig): Resolved {
  * const result = await schema.safeParseAsync(value); // 非同期必須
  * ```
  *
- * `semantic()` は1回の parse につき JEV を**1回**だけ呼び、そのスキーマの条件を
+ * `semantic()` は1回の parse につき Jev を**1回**だけ呼び、そのスキーマの条件を
  * まとめて1リクエストに載せる。条件を増やしてもレイテンシはほとんど増えない。
  */
 export function createJevZod(config: JevZodConfig = {}) {

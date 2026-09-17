@@ -58,7 +58,7 @@ export interface SharedState {
 }
 
 /**
- * グループごとに JEV を1回呼ぶ。質問は並列・独立に評価されるので、
+ * グループごとに Jev を1回呼ぶ。質問は並列・独立に評価されるので、
  * 「この parse で必要な判定」はすべて同じリクエストに載せる（speculative fan-out）。
  * 送った質問のうち、成立しなかったものだけを issue にする。
  */
@@ -89,7 +89,7 @@ async function judgeGroup(
     questions[target.key] = noul(target.instructions, target.criteria);
   }
 
-  // JEV の予算（約 32,000 トークン ≈ 150,000 文字）は state と questions の共有。
+  // Jev の予算（約 32,000 トークン ≈ 150,000 文字）は state と questions の共有。
   // 両方を数えて、超えるなら API を叩かずに落とす。
   const characters = JSON.stringify(state).length + JSON.stringify(questions).length;
   if (characters > config.maxStateCharacters) {

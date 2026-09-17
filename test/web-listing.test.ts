@@ -1,5 +1,5 @@
 /**
- * デモ web アプリ（出品画面の裏で JEV が判定する）の振る舞いを固定するテスト。
+ * デモ web アプリ（出品画面の裏で Jev が判定する）の振る舞いを固定するテスト。
  * 「利用者には普通のフォームのエラーと結果だけを見せる」線引きを守る。
  */
 import { describe, expect, it } from "vitest";
@@ -35,7 +35,7 @@ function setup(handler: Parameters<typeof recordingFetch>[0], mode: ListingMode 
 }
 
 describe("出品画面の裏側（listing service）", () => {
-  it("形式エラーは普通のフィールドエラーにして、JEV は呼ばない", async () => {
+  it("形式エラーは普通のフィールドエラーにして、Jev は呼ばない", async () => {
     const { recorder, service } = setup(answering());
 
     const result = await service.submit({ ...draft, title: "", body: "短い", price: 100 });
@@ -140,7 +140,7 @@ describe("出品画面の裏側（listing service）", () => {
     expect((await service.list())[0]!.issues).toHaveLength(1);
   });
 
-  it("off は JEV を呼ばず、鍵が無くても動く（キルスイッチ）", async () => {
+  it("off は Jev を呼ばず、鍵が無くても動く（キルスイッチ）", async () => {
     const service = createListingService({ mode: "off", nextId: () => "m00000000009" });
 
     const result = await service.submit(draft);
@@ -186,7 +186,7 @@ describe("出品画面の裏側（listing service）", () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.fieldErrors.body).toEqual(["商品の説明は10文字以上で入力してください"]);
-    expect(recorder.calls).toHaveLength(0); // 形が足りないので JEV は呼ばない
+    expect(recorder.calls).toHaveLength(0); // 形が足りないので Jev は呼ばない
   });
 
   it("空欄は「まだ入力していない」として扱い、その条件は聞かない", async () => {
@@ -202,7 +202,7 @@ describe("出品画面の裏側（listing service）", () => {
     expect(Object.keys(recorder.calls[0]!.body.questions)).toHaveLength(ListingRules.length - 1);
   });
 
-  it("何も入力していなければ JEV を呼ばない", async () => {
+  it("何も入力していなければ Jev を呼ばない", async () => {
     const { recorder, service } = setup(answering());
 
     const result = await service.precheck({});

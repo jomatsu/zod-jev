@@ -12,7 +12,7 @@ import type {
 } from "@typesafe-ai/sdk";
 
 /**
- * JEV が受理する JSON 値。公式 SDK の `JsonValue` と同じ定義。
+ * Jev が受理する JSON 値。公式 SDK の `JsonValue` と同じ定義。
  * `Date` / `Map` / `undefined` は含まれない（`SemanticOptions.toJSON` で変換する）。
  */
 export type JevJson = JsonValue;
@@ -70,7 +70,7 @@ export interface SemanticRule {
   readonly id: string;
   /**
    * 成立してほしい条件。**「はい」で確率が 1 に近づく問い**として書く。
-   * 既定ではこの文字列がそのまま JEV の `instructions.question` になる。
+   * 既定ではこの文字列がそのまま Jev の `instructions.question` になる。
    */
   readonly is: string;
   /** 条件が成立していない（`rejected`）と判定したときに表示する、開発者が定義したメッセージ。 */
@@ -82,7 +82,7 @@ export interface SemanticRule {
   /** `uncertain` と判定したときのメッセージ。既定は「確認が必要です」。 */
   readonly uncertainMessage?: string;
   /**
-   * JEV に送る `instructions` 全体を差し替える。
+   * Jev に送る `instructions` 全体を差し替える。
    * 文字列・オブジェクト・配列・null が使える（構造化したほうが問いが明確になる）。
    */
   readonly instructions?: JevEntry;
@@ -170,7 +170,7 @@ export interface JevZodConfig {
   /** 公式 SDK のログレベル。 */
   readonly logLevel?: LogLevel;
   /**
-   * state + questions の文字数上限。既定 150,000（JEV の約 32,000 トークン予算に相当）。
+   * state + questions の文字数上限。既定 150,000（Jev の約 32,000 トークン予算に相当）。
    * 超えた場合は API を叩かずに `state_too_large` を返す。
    */
   readonly maxStateCharacters?: number;
@@ -195,7 +195,7 @@ export interface JevZodConfig {
  */
 export type ZodSemantic<S extends Z.ZodType> = S;
 
-/** 各要素を JEV で検証する配列スキーマ。 */
+/** 各要素を Jev で検証する配列スキーマ。 */
 export type ZodSemanticArray<S extends Z.ZodType> = Z.ZodArray<S>;
 
 /** `createJevZod()` が返す `semantic`。 */

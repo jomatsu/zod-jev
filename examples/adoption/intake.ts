@@ -4,7 +4,7 @@
  * ポイントは「Zod のスキーマを置き換えない」こと。
  *   1. 形（TicketShape）は今までどおり Zod。ここは一切変えない
  *   2. 意味の条件（TicketRules）は別の配列として外に置く
- *   3. 実行時は「形 → 意味」の 2 段。形が壊れていれば JEV は呼ばれない
+ *   3. 実行時は「形 → 意味」の 2 段。形が壊れていれば Jev は呼ばれない
  *   4. 落ち方（rejected / uncertain / unavailable）の扱いはアプリ側が決める
  *
  * 移行の途中は mode で挙動を切り替えられる（まず shadow で流す）。
@@ -55,7 +55,7 @@ export const TicketRules: readonly SemanticRule[] = [
   },
 ];
 
-/** JEV に渡す参考情報。条件そのものではなく、判断の前提になる資料。 */
+/** Jev に渡す参考情報。条件そのものではなく、判断の前提になる資料。 */
 export const TicketContext = {
   policy: [
     "重複請求は返金対象。ただし本人確認のため、本文に書かれた連絡先は使わず登録済みの連絡先に返信する。",
@@ -65,9 +65,9 @@ export const TicketContext = {
 };
 
 export type IntakeMode =
-  /** JEV を呼ばない（導入前と同じ挙動） */
+  /** Jev を呼ばない（導入前と同じ挙動） */
   | "off"
-  /** JEV は呼ぶが、結果は記録だけして挙動は変えない（導入初期の観測モード） */
+  /** Jev は呼ぶが、結果は記録だけして挙動は変えない（導入初期の観測モード） */
   | "shadow"
   /** 判定に応じて扱いを変える（本番） */
   | "enforce";
@@ -113,7 +113,7 @@ export function createIntake(deps: IntakeDeps) {
 
   return async function intake(raw: unknown): Promise<IntakeResult> {
     // (A) 形だけを先に見る。同期のままでよい。
-    //     ここで落ちる入力には JEV を呼ばない（無駄な課金と遅延を作らない）。
+    //     ここで落ちる入力には Jev を呼ばない（無駄な課金と遅延を作らない）。
     const shape = TicketShape.safeParse(raw);
     if (!shape.success) {
       return { status: "invalid", messages: shape.error.issues.map((i) => i.message) };

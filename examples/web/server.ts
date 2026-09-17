@@ -2,11 +2,11 @@
  * デモ web アプリの HTTP 層（ローカル実行用）。
  *
  *   npx tsx examples/web/server.ts                  # 実 API（TYPESAFE_API_KEY / .env）
- *   npx tsx examples/web/server.ts --fake           # 偽の JEV（鍵不要・課金なし）
+ *   npx tsx examples/web/server.ts --fake           # 偽の Jev（鍵不要・課金なし）
  *   npx tsx examples/web/server.ts --mode=shadow    # 判定はするが挙動は変えない（観測）
- *   npx tsx examples/web/server.ts --mode=off       # JEV を呼ばない（キルスイッチ）
+ *   npx tsx examples/web/server.ts --mode=off       # Jev を呼ばない（キルスイッチ）
  *
- *   /      利用者向け: フリマアプリの出品画面（JEV の存在は見せない）
+ *   /      利用者向け: フリマアプリの出品画面（Jev の存在は見せない）
  *   /ops   開発者向け: 裏で何を判定したか（確率・送信内容・トークン）
  *
  * API キーはこのプロセスにだけ置きます。ブラウザには渡しません。
@@ -38,7 +38,7 @@ const mode: ListingMode = modeArg === "off" || modeArg === "shadow" ? modeArg : 
 const port = Number(process.env.PORT ?? 5178);
 const apiKey = process.env.TYPESAFE_API_KEY;
 
-// mode: off（キルスイッチ）なら JEV のクライアントを作らないので、鍵が無くても起動できる
+// mode: off（キルスイッチ）なら Jev のクライアントを作らないので、鍵が無くても起動できる
 if (!fake && mode !== "off" && (apiKey === undefined || apiKey === "")) {
   console.error("TYPESAFE_API_KEY が必要です（鍵無しで試すなら --fake、判定を切るなら --mode=off）");
   process.exit(1);

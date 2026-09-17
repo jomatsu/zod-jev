@@ -1,7 +1,7 @@
 import * as Z from "zod";
 
 /**
- * JEV の `state` / `instructions` / `context` に載せられる値。
+ * Jev の `state` / `instructions` / `context` に載せられる値。
  * JSON に落ちない値（`Date`、`Map`、`undefined`、関数…）はここで弾く。
  */
 export const JevJsonSchema = Z.json();

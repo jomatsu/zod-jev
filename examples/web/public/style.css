@@ -161,6 +161,11 @@ a:hover {
   line-height: 1.6;
 }
 
+/* モバイル用のトグルバー。デスクトップでは常時展開なので出さない */
+.demo-sheet-bar {
+  display: none;
+}
+
 .demo-head {
   display: flex;
   align-items: center;
@@ -401,17 +406,105 @@ a:hover {
 }
 
 @media (max-width: 1180px) {
+  /* デモ操作パネルは画面下から出るシートにする。閉じているときはバーだけ見える */
   .demo-console {
-    position: static;
+    position: fixed;
+    inset: auto 0 0 0;
     width: auto;
     height: auto;
-    margin: 12px;
-    border: 3px dashed #3b4250;
-    border-radius: 8px;
+    max-height: 78vh;
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-top: 3px dashed #3b4250;
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -10px 26px rgba(0, 0, 0, 0.35);
+    overflow: hidden;
+    transform: translateY(calc(100% - 52px));
+    transition: transform 0.22s ease;
+    z-index: 40;
+  }
+
+  .demo-console.open {
+    transform: translateY(0);
+  }
+
+  .demo-inner {
+    max-height: calc(78vh - 52px);
+    overflow-y: auto;
+    padding: 14px 16px 10px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* シートの取っ手。常に見えていて、タップで開閉する */
+  .demo-sheet-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    height: 52px;
+    padding: 0 14px;
+    border: none;
+    border-bottom: 1px solid #262b36;
+    background: #14161c;
+    color: #e6e9ef;
+    font-family: inherit;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .demo-sheet-bar:focus-visible {
+    outline: 2px solid #ffd24a;
+    outline-offset: -2px;
+  }
+
+  .demo-sheet-title {
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .demo-sheet-status {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #98a1b3;
+    font-size: 11.5px;
+  }
+
+  .demo-sheet-status.alert {
+    color: #ffc9c9;
+  }
+
+  .demo-sheet-status.warn {
+    color: #ffe6a8;
+  }
+
+  .demo-sheet-caret {
+    flex: none;
+    font-size: 10px;
+    color: #98a1b3;
+    transition: transform 0.22s ease;
+  }
+
+  .demo-console.open .demo-sheet-caret {
+    transform: rotate(180deg);
+  }
+
+  /* パネルの見出しはバーと重複するのでシート内では出さない */
+  .demo-head {
+    display: none;
+  }
+
+  .demo-note {
+    margin-top: 0;
   }
 
   .app-frame {
     padding-right: 0;
+    padding-bottom: 64px; /* バーに隠れないように */
   }
 }
 
@@ -1042,9 +1135,106 @@ body.ops .muted {
   .row {
     grid-template-columns: minmax(0, 1fr);
     gap: 4px;
+    padding: 9px 0;
   }
 
   .row > .label {
     padding-top: 0;
+  }
+
+  /* iOS で入力時に勝手に拡大されるのを防ぐ */
+  input[type="text"],
+  input[type="number"],
+  textarea,
+  select {
+    font-size: 16px;
+  }
+
+  .photo {
+    width: 68px;
+    height: 68px;
+  }
+
+  .form-card {
+    padding: 12px 14px 16px;
+    border-radius: 8px;
+  }
+
+  .form-head {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .form-head h1 {
+    font-size: 18px;
+  }
+
+  .form-head .draft {
+    margin-left: auto;
+    font-size: 11px;
+  }
+
+  .page {
+    padding: 12px 12px 20px;
+  }
+
+  .global-header .inner {
+    height: 52px;
+    gap: 10px;
+    padding: 0 12px;
+  }
+
+  .wordmark {
+    font-size: 19px;
+  }
+
+  .global-search {
+    height: 32px;
+    font-size: 12px;
+  }
+
+  .global-nav {
+    gap: 8px;
+    font-size: 12px;
+  }
+
+  /* ヘッダの文言はスマホでは省いてアバターだけ残す */
+  .global-nav span:not(.avatar) {
+    display: none;
+  }
+
+  .preview .name {
+    min-height: 0;
+  }
+
+  footer.site-footer {
+    padding: 0 12px 24px;
+    font-size: 11px;
+  }
+
+  /* 開発者向けページの表は横スクロールにする */
+  body.ops .page {
+    padding: 12px 12px 32px;
+  }
+
+  body.ops .card {
+    padding: 14px 14px 18px;
+  }
+
+  body.ops #rules {
+    overflow-x: auto;
+  }
+
+  body.ops table {
+    min-width: 560px;
+  }
+
+  body.ops .record > summary {
+    gap: 6px;
+    font-size: 12px;
+  }
+
+  body.ops pre.json {
+    font-size: 11px;
   }
 }

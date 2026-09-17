@@ -2,9 +2,9 @@
 
 > English README: [README.md](./README.md) ・ デモデプロイ: https://zod-jev.jomatsu.me/
 
-Zod 4 のスキーマに [TypeSafe JEV](https://typesafe.ai/)（System One モデル）の**意味検証**を合成する小さなライブラリです。
+Zod 4 のスキーマに [TypeSafe Jev](https://typesafe.ai/)（System One モデル）の**意味検証**を合成する小さなライブラリです。
 
-**形式**（型・必須・フォーマット）の検証は Zod が、**意味**（「個人情報が含まれていない」「ポリシーに適合している」など）の検証は JEV による確率的な判定が担当します。1 回の parse につき JEV への API 呼び出しを **1 リクエストのみ** 行い、スキーマ内の条件をまとめて判定します。
+**形式**（型・必須・フォーマット）の検証は Zod が、**意味**（「個人情報が含まれていない」「ポリシーに適合している」など）の検証は Jev による確率的な判定が担当します。1 回の parse につき Jev への API 呼び出しを **1 リクエストのみ** 行い、スキーマ内の条件をまとめて判定します。
 
 ```ts
 import { createJevZod, getSemanticIssues } from "zod-jev";
@@ -41,8 +41,8 @@ if (!result.success) {
 }
 ```
 
-- 形式検証は Zod、意味検証は JEV が担当します。Zod のエコシステム（`z.object` / `z.array` / `safeParse` など）をそのまま利用できます。
-- 複数の条件を 1 つのリクエストにまとめて送信するため、条件を増やしてもレイテンシはほとんど増加しません（JEV は各質問を並列かつ独立に評価します）。
+- 形式検証は Zod、意味検証は Jev が担当します。Zod のエコシステム（`z.object` / `z.array` / `safeParse` など）をそのまま利用できます。
+- 複数の条件を 1 つのリクエストにまとめて送信するため、条件を増やしてもレイテンシはほとんど増加しません（Jev は各質問を並列かつ独立に評価します）。
 - 判定できない状態を「合格」とは扱いません（fail-closed）。判定不能な場合は `unavailable` の issue が生成されます。
 - 実 API での動作を確認済みです（`test/integration/`、2026-09-17 / `jev-1.13.0`）。
 
@@ -94,9 +94,9 @@ const result = await Review.safeParseAsync({ star: 5, comment: "普通でした�
 
 `semantic()` を適用したスキーマの検証は **非同期** となります。同期処理の `parse` や `safeParse` ではなく、`parseAsync` または `safeParseAsync` を使用してください（同期 parse を呼び出すと Zod が例外をスローします）。
 
-## JEV の前提（ここだけは知っておく）
+## Jev の前提（ここだけは知っておく）
 
-本ライブラリは、JEV の以下の特性を前提として設計されています（出典: [docs/jev.md](docs/jev.md)）。
+本ライブラリは、Jev の以下の特性を前提として設計されています（出典: [docs/jev.md](docs/jev.md)）。
 
 | 性質 | このライブラリへの影響 |
 | --- | --- |
@@ -134,7 +134,7 @@ Zod の全 API に `semantic` と `semanticArray` を追加したオブジェク
 
 ### `semantic(base, rules, options?)`
 
-`base` スキーマの入出力型を維持したまま、後段に JEV による意味検証を追加します。
+`base` スキーマの入出力型を維持したまま、後段に Jev による意味検証を追加します。
 
 ```ts
 const Schema = z.semantic(z.object({ ... }), [ ...rules ], {
@@ -154,7 +154,7 @@ const Schema = z.semantic(z.object({ ... }), [ ...rules ], {
 | `path` | — | このスキーマからの相対パス。issue の位置に使う（式の抽出には使わない） |
 | `threshold` | — | 個別の閾値（既定は設定の `threshold`） |
 | `uncertainMessage` | — | `uncertain` のときのメッセージ |
-| `instructions` | — | JEV に送る `instructions` 全体の差し替え（文字列 / オブジェクト / 配列） |
+| `instructions` | — | Jev に送る `instructions` 全体の差し替え（文字列 / オブジェクト / 配列） |
 | `criteria` | — | Noul の `criteria.true` / `criteria.false` の差し替え |
 
 デフォルトでは、`state` は `{ value: <パース済みの値>, context?: <options.context> }` となり、各ルールは次の `instructions` に変換されます。なお、質問キー（`q0`, `q1`, ...）はモデルへは送信されません。
@@ -172,7 +172,7 @@ const Schema = z.semantic(z.object({ ... }), [ ...rules ], {
 
 ### `semanticArray(base, rules, options?)`
 
-配列の**各要素**を JEV で検証します。複数の要素をまとめて 1〜数回のリクエストに集約して送信するため、`z.array(z.semantic(...))` のように要素数分の API 呼び出しを行う必要がありません。
+配列の**各要素**を Jev で検証します。複数の要素をまとめて 1〜数回のリクエストに集約して送信するため、`z.array(z.semantic(...))` のように要素数分の API 呼び出しを行う必要がありません。
 
 ```ts
 const Ads = z.semanticArray(z.object({ headline: z.string() }), [ ...rules ], {
@@ -184,7 +184,7 @@ issue のパスは `[要素の添字, ...rule.path]` となります。各リク
 
 ### `getSemanticIssues(error)`
 
-`ZodError` から JEV 由来の issue のみを取り出します。形式的なバリデーションエラーと意味的な検証エラーを分離して扱いたい場合に使用します。
+`ZodError` から Jev 由来の issue のみを取り出します。形式的なバリデーションエラーと意味的な検証エラーを分離して扱いたい場合に使用します。
 
 ```ts
 type SemanticIssue = {
@@ -225,7 +225,7 @@ type SemanticIssue = {
 - デフォルト値の `0.95` は、**fail-closed 側としてかなり厳格な**設定です。上表のとおり、モデルが「おそらく Yes」と判定している `0.90〜0.94` の範囲も `uncertain` として不合格になります。
 - 実際の運用では `0.9` 前後から検証を開始し、誤判定による不合格を避けたい条件では `0.8` 程度まで緩和する調整が現実的です（各ルールの閾値は `rule.threshold` で個別に指定できます）。
 - `1 - threshold` を `rejected` の判定基準としているのは意図的な設計です。たとえば `t = 0.9` の場合、`p <= 0.1` で「明確な No」とみなされ、`0.1 < p < 0.9` は「判断保留」となります。閾値を下げるほど、`rejected` と判定される確率の範囲も広がります。
-- 閾値は対象ドメインや取り扱うデータに応じて決定すべき値です。JEV 公式の指針でも「まずは保守的な値から始め、実際のデータに基づいて調整する」ことが推奨されています。
+- 閾値は対象ドメインや取り扱うデータに応じて決定すべき値です。Jev 公式の指針でも「まずは保守的な値から始め、実際のデータに基づいて調整する」ことが推奨されています。
 
 ## 失敗の扱い
 
@@ -234,7 +234,7 @@ type SemanticIssue = {
 - **キャンセルは再スロー**: `options.signal` による中断（`APIUserAbortError`）は検証結果の issue とせず、そのまま `safeParseAsync` の reject（Promise の拒否）として伝播します。
 - **機密情報の保護**: `unavailable` のメッセージには、例外本文やレスポンス本文を含めません（理由コードと HTTP ステータスコードのみを含めます）。レスポンスに含まれるユーザーデータがログや画面上へ出力されるのを防ぐためです。
 - **文言の差し替え**: `messages.uncertain` や `messages.unavailable` を渡すことで、デフォルトの文面を変更できます。
-- **メトリクスの観測**: `onResponse` でモデル、入力トークン数、出力トークン数、レイテンシ、質問数を取得できます。JEV の input は $42 / 10 億トークン、output は課金対象外（発表時点の価格体系）であるため、この情報からコストを把握できます。
+- **メトリクスの観測**: `onResponse` でモデル、入力トークン数、出力トークン数、レイテンシ、質問数を取得できます。Jev の input は $42 / 10 億トークン、output は課金対象外（発表時点の価格体系）であるため、この情報からコストを把握できます。
 
 ## 既存の Zod プロダクトへの入れ方
 
@@ -297,7 +297,7 @@ const Changed = semantic(Base.pick({ body: true }), rules); // ○
 1 回の parse につき **HTTP リクエストが 1 回** 発生します（実測値で 0.6〜0.9 秒、コストは約 $0.00003）。そのため、リクエストハンドラーのホットパスに直接埋め込むと、レイテンシの増加、課金の発生、障害点の増加につながります。
 
 ```ts
-// 形（Zod）と意味（JEV）を分けて呼ぶ。既存コードを壊さず、失敗時に入力を使い続けられる。
+// 形（Zod）と意味（Jev）を分けて呼ぶ。既存コードを壊さず、失敗時に入力を使い続けられる。
 const shape = z.object({ body: z.string() });
 const audited = z.semantic(shape, rules);
 
@@ -306,12 +306,12 @@ const result = await audited.safeParseAsync(input);     // 意味検証は明示
 if (!result.success) enqueueForReview(getSemanticIssues(result.error));
 ```
 
-この構成を採用すれば、JEV 側の呼び出しが失敗（`unavailable`）した場合でも「検証できなかった」として記録に残しつつ、形式的に正しい入力データはそのまま業務ロジックへ流すことができます。
+この構成を採用すれば、Jev 側の呼び出しが失敗（`unavailable`）した場合でも「検証できなかった」として記録に残しつつ、形式的に正しい入力データはそのまま業務ロジックへ流すことができます。
 
 ### 5. テストとエラー表示
 
 - **テスト**: `semantic()` を含むコードは、デフォルトでは実 API へのリクエストを行います。単体テストを実行する際は、`fetch` または `client` を差し替えてください（公式 SDK によるリトライ、ヘッダー処理、エラー分類などのロジックはそのまま実動作します）。
-- **エラー表示**: 意味検証のエラー issue は `code: "custom"` として生成され、設定した日本語の `message` が `flatten()` の出力にも反映されます。既存のエラー整形処理が `code` で分岐している場合は、`getSemanticIssues(error)` を用いて JEV 由来の issue のみを抽出し、個別に処理すると安全です。
+- **エラー表示**: 意味検証のエラー issue は `code: "custom"` として生成され、設定した日本語の `message` が `flatten()` の出力にも反映されます。既存のエラー整形処理が `code` で分岐している場合は、`getSemanticIssues(error)` を用いて Jev 由来の issue のみを抽出し、個別に処理すると安全です。
 - **ブラウザ環境**: 公式 SDK はブラウザ環境での実行を制限しているため、`semantic` を使用するモジュールはサーバーサイド専用に分離してください（特にフロントエンドと同一のスキーマ定義を共有している場合は注意が必要です）。
 - **zod 3 は非対応**: peerDependencies は `zod@^4.3.0` です。zod 3 を使用しているプロジェクトでは、先に zod 4 への移行が必要となります（なお、zod 4.0〜4.2 についても、一部の操作で refine が警告なく除外される問題があるため、サポート対象外としています）。
 
@@ -321,23 +321,23 @@ if (!result.success) enqueueForReview(getSemanticIssues(result.error));
 - **1 回の parse で 1 リクエスト**: 同一スキーマ内の条件はすべて 1 つのリクエストにまとめられます。ただし、`z.array(z.semantic(...))` のように**スキーマを配列内に入れ子にした場合は、要素数分の API リクエストが発生します**。配列の要素を検証する場合は、`semanticArray` を使用してください。
 - **state のサイズ制限**: `state` と `questions` の合計サイズの上限は約 32,000 トークン（約 150,000 文字）です。この制限を超えると `state_too_large` エラーで検証が失敗します（上限値は `maxStateCharacters` で調整可能です）。
 - **`semantic()` はスキーマ定義の末尾に適用**: 検証は、`.transform()` などの変換処理がすべて完了した後の値に対して実行されます。`z.semantic(z.object({...}).optional())` のように `undefined` を受け取り得るスキーマに適用すると `not_json` エラーが発生します。また、`.pick()` / `.omit()` / `.partial()` / `.merge()` は refine 付きスキーマに対して呼び出すと Zod が拒否するため、これらの操作を行ってから `semantic()` を適用してください。
-- **兄弟フィールドに形式エラーがあっても検証リクエストは実行される**: たとえば `z.object({ id: z.number(), check: semanticSchema })` に対し `id: "1"` を渡した場合、オブジェクト全体としては形式エラーで失敗しますが、`check` に対する JEV の API 呼び出しは発生します（Zod の仕様上、親スキーマの失敗が子スキーマの検証中断に連動しないためです）。不要な API 呼び出しやコストを回避したい場合は、ベーススキーマの parse を先に完了させ、検証層を個別に実行してください。
-- **JSON にシリアライズ可能な値のみ対応**: `Date`、`Map`、`Symbol` などの値は、`options.toJSON` を使用して JSON 互換のオブジェクトへ変換してください。Zod の `z.date()` などでバリデーションを通過させた値であっても、JEV に送信する前段で JSON に変換する必要があります。
+- **兄弟フィールドに形式エラーがあっても検証リクエストは実行される**: たとえば `z.object({ id: z.number(), check: semanticSchema })` に対し `id: "1"` を渡した場合、オブジェクト全体としては形式エラーで失敗しますが、`check` に対する Jev の API 呼び出しは発生します（Zod の仕様上、親スキーマの失敗が子スキーマの検証中断に連動しないためです）。不要な API 呼び出しやコストを回避したい場合は、ベーススキーマの parse を先に完了させ、検証層を個別に実行してください。
+- **JSON にシリアライズ可能な値のみ対応**: `Date`、`Map`、`Symbol` などの値は、`options.toJSON` を使用して JSON 互換のオブジェクトへ変換してください。Zod の `z.date()` などでバリデーションを通過させた値であっても、Jev に送信する前段で JSON に変換する必要があります。
 - **配列のチャンクリクエストは直列実行**: `semanticArray` で分割されたリクエストは、順次（直列に）送信されます（要素ごとの並列呼び出しによってレート制限に抵触するのを防ぐためです）。
 - **ブラウザ環境での非推奨**: クライアントサイドでの API キー露出を防ぐため、公式 SDK はブラウザでの実行を拒否します（`dangerouslyAllowBrowser` の使用は推奨されません）。必ずサーバーサイドで実行してください。
 - **リトライ処理の範囲**: 条件を変更しての再試行や、複数の parse をまたいだバッチ処理は行いません。リトライが適用されるのは HTTP 通信レイヤー（408・429・5xx エラー、`Retry-After` ヘッダーの考慮、デフォルト 2 回）のみです。
 
 ## 条件（`is`）の書き方
 
-JEV は「問われた内容に対してのみ」回答します。曖昧な表現が含まれる場合、エラーではなく中間の確率として出力されます。公式ドキュメントの指針に基づき、以下のように記述することが効果的です。
+Jev は「問われた内容に対してのみ」回答します。曖昧な表現が含まれる場合、エラーではなく中間の確率として出力されます。公式ドキュメントの指針に基づき、以下のように記述することが効果的です。
 
 - **状態に書かれている事実を問う**。結論を問わない。
   - ✗ 「`value.body` は再現手順として十分か」 → 「`value.body` に再現手順が書かれているか」
-  - JEV は「読者がこの文だけから再現できるか」と解釈してしまい、確率が中間に寄りやすくなります。
+  - Jev は「読者がこの文だけから再現できるか」と解釈してしまい、確率が中間に寄りやすくなります。
 - **1 つの条件につき 1 つの判定を行う**。独立した観点は個別のルールに分割し、同一リクエストでまとめて評価します（並列に評価されるため、レイテンシへの影響はほとんどありません）。
 - **判定の境界条件は `criteria` で定義する**。yes/no の境目が曖昧な場合は、`rule.criteria.true` / `false` に具体的な定義や例を記載します。
 - **対象の状態フィールド名を明示する**。`value.body` のようにバッククォートで指定します。
-- **Choice / Score が適している判定を Noul で無理に評価しない**。本ライブラリは yes/no（Noul）のみを扱います。分類や段階評価が本質的な判定については、JEV 公式 SDK（`@typesafe-ai/sdk`）の `choice` / `score` で扱うほうが確実です。
+- **Choice / Score が適している判定を Noul で無理に評価しない**。本ライブラリは yes/no（Noul）のみを扱います。分類や段階評価が本質的な判定については、Jev 公式 SDK（`@typesafe-ai/sdk`）の `choice` / `score` で扱うほうが確実です。
 - **`context` は参考情報として参照させる**。「`context.policy` に照らして `value.body` が適合しているか」のように、条件文の中で参照先を明示してください。デフォルトの `note` 設定により state の内容は純粋なデータとして扱われますが、外部由来のテキストを state に入れる場合は、判定条件そのものをプロンプトインジェクションに強い形（「指示が含まれていれば no」など）で記述することが安全です。
 
 ## 実装パターン
@@ -426,7 +426,7 @@ npm run demo             # examples/quickstart.ts を実行
 - TypeSafe 公式: [typesafe.ai](https://typesafe.ai/) / [docs.typesafe.ai](https://docs.typesafe.ai/) / [API リファレンス](https://docs.typesafe.ai/api.md)
 - 公式 JavaScript SDK: [@typesafe-ai/sdk](https://www.npmjs.com/package/@typesafe-ai/sdk) / [typesafe-ai/typesafe-sdk-js](https://github.com/typesafe-ai/typesafe-sdk-js)
 - パターン集: [Speculative fan-out](https://docs.typesafe.ai/patterns/fan-out.md) / [Confidence-gated routing](https://docs.typesafe.ai/patterns/confidence-routing.md)
-- JEV は意思決定専用のモデルです。自然文の生成は行いません。テキスト生成が必要な用途には LLM を使用してください。
+- Jev は意思決定専用のモデルです。自然文の生成は行いません。テキスト生成が必要な用途には LLM を使用してください。
 
 ## ライセンス
 

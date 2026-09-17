@@ -1,4 +1,4 @@
-// 開発者向け: 出品フォームの裏側で JEV が何を判定したかを見るページ。
+// 開発者向け: 出品フォームの裏側で Jev が何を判定したかを見るページ。
 const STATUS_LABEL = {
   published: "公開中",
   review: "審査中",
@@ -190,7 +190,7 @@ function renderRecord(record) {
   body.append(metrics);
 
   const raw = el("details", "raw");
-  raw.append(el("summary", undefined, "JEV への送信内容 / 返却された確率"));
+  raw.append(el("summary", undefined, "Jev への送信内容 / 返却された確率"));
   raw.append(
     el(
       "pre",

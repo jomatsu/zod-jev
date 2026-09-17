@@ -40,7 +40,7 @@ function setup(
 }
 
 describe("導入の実例（ticket intake）", () => {
-  it("off は JEV を呼ばず、鍵も要らない（キルスイッチ）", async () => {
+  it("off は Jev を呼ばず、鍵も要らない（キルスイッチ）", async () => {
     const recorder = recordingFetch(answering());
     const intake = createIntake({ mode: "off", fetch: recorder.fetch });
 
@@ -89,7 +89,7 @@ describe("導入の実例（ticket intake）", () => {
     }
   });
 
-  it("enforce は JEV 障害でも入力を受け、レビューに回す（fail-open の判断はアプリ側）", async () => {
+  it("enforce は Jev 障害でも入力を受け、レビューに回す（fail-open の判断はアプリ側）", async () => {
     const onResponse = vi.fn();
     const recorder = recordingFetch(() => {
       throw new TypeError("fetch failed");
@@ -112,7 +112,7 @@ describe("導入の実例（ticket intake）", () => {
     expect(onResponse).not.toHaveBeenCalled(); // 応答が無いので計測も無い
   });
 
-  it("形が壊れている入力では JEV を呼ばない", async () => {
+  it("形が壊れている入力では Jev を呼ばない", async () => {
     const { recorder, intake } = setup(answering(), "enforce");
 
     const result = await intake({ subject: "", body: "" });

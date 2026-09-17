@@ -130,7 +130,7 @@ describe("既存の Zod コードとの噛み合わせ", () => {
 
     const result = await Parent.safeParseAsync({ id: 1 as never, check: { body: "x" } });
 
-    // 全体は形式エラーで落ちるが、検証済みの check に対しては JEV が呼ばれる。
+    // 全体は形式エラーで落ちるが、検証済みの check に対しては Jev が呼ばれる。
     // 無駄な課金を避けたい場合は、base を先に parse してから semantic 層を別に走らせる。
     expect(result.success).toBe(false);
     expect(recorder.calls).toHaveLength(1);
