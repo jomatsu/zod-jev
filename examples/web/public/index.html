@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>商品レビューを書く | Example Store</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <header>
+      <p class="brand">Example Store</p>
+      <h1>商品レビューを書く</h1>
+      <p class="lead">
+        「コンパクト収納デスク」をご購入いただきありがとうございます。今後の参考のため、ご感想をお聞かせください。
+      </p>
+    </header>
+
+    <main class="card">
+      <div id="alert" class="alert" hidden></div>
+
+      <form id="form" novalidate>
+        <div class="field">
+          <label for="nickname">ニックネーム<span class="req">必須</span></label>
+          <input id="nickname" name="nickname" type="text" maxlength="20" autocomplete="nickname" />
+          <p class="field-error" id="err-nickname"></p>
+        </div>
+
+        <fieldset class="field">
+          <legend>評価<span class="req">必須</span></legend>
+          <div class="stars">
+            <label><input type="radio" name="rating" value="5" /> ★★★★★</label>
+            <label><input type="radio" name="rating" value="4" /> ★★★★</label>
+            <label><input type="radio" name="rating" value="3" /> ★★★</label>
+            <label><input type="radio" name="rating" value="2" /> ★★</label>
+            <label><input type="radio" name="rating" value="1" /> ★</label>
+          </div>
+          <p class="field-error" id="err-rating"></p>
+        </fieldset>
+
+        <div class="field">
+          <label for="title">タイトル<span class="req">必須</span></label>
+          <input id="title" name="title" type="text" maxlength="60" />
+          <p class="field-error" id="err-title"></p>
+        </div>
+
+        <div class="field">
+          <label for="body">レビュー本文<span class="req">必須</span></label>
+          <textarea id="body" name="body" rows="6" maxlength="2000"></textarea>
+          <p class="hint">10文字以上。使った場面や、良かった点・気になった点をご記入ください。</p>
+          <p class="field-error" id="err-body"></p>
+        </div>
+
+        <div class="field">
+          <label for="email">メールアドレス<span class="opt">任意</span></label>
+          <input id="email" name="email" type="email" autocomplete="email" />
+          <p class="hint">掲載内容について確認が必要な場合のみご連絡します。</p>
+          <p class="field-error" id="err-email"></p>
+        </div>
+
+        <button id="submit" class="primary" type="submit">レビューを投稿する</button>
+      </form>
+
+      <section id="done" class="done" hidden>
+        <div class="mark">✓</div>
+        <h2>レビューを投稿しました</h2>
+        <p class="muted">
+          投稿ID: <span class="receipt" id="receipt-id"></span><br />
+          <span id="receipt-note">内容を確認のうえ、順次掲載します。</span>
+        </p>
+      </section>
+    </main>
+
+    <footer>
+      このページはデモです。投稿された内容は
+      <a href="/ops">運用画面</a>
+      で確認できます。
+    </footer>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
