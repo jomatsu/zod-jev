@@ -1,0 +1,72 @@
+{
+  "name": "zod-jev",
+  "version": "0.1.0",
+  "description": "Zod 4 に TypeSafe JEV (System One) の意味検証を合成する。形式は Zod、意味は JEV の noul 質問で検証する。",
+  "license": "MIT",
+  "author": "jomatsu",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jomatsu/zod-jev.git"
+  },
+  "homepage": "https://github.com/jomatsu/zod-jev#readme",
+  "keywords": [
+    "zod",
+    "jev",
+    "typesafe",
+    "semantic-validation",
+    "llm",
+    "system-one"
+  ],
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/esm/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "check:dist": "node scripts/check-dist.mjs",
+    "demo": "tsx examples/quickstart.ts",
+    "demo:web": "tsx examples/web/server.ts",
+    "demo:web:fake": "tsx examples/web/server.ts --fake",
+    "check": "npm run typecheck && npm run test && npm run build && npm run check:dist",
+    "prepublishOnly": "npm run check"
+  },
+  "dependencies": {
+    "@typesafe-ai/sdk": "^0.6.0"
+  },
+  "peerDependencies": {
+    "zod": "^4.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.3",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11",
+    "zod": "^4.6.5"
+  }
+}
