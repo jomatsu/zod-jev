@@ -189,6 +189,19 @@ describe("出品画面の裏側（listing service）", () => {
     expect(recorder.calls).toHaveLength(0); // 形が足りないので JEV は呼ばない
   });
 
+  it("空欄は「まだ入力していない」として扱い、その条件は聞かない", async () => {
+    const { recorder, service } = setup(answering());
+
+    // 価格が空欄（フォーム上はそうなる）。不正値として弾かず、価格の条件をスキップする
+    const result = await service.precheck({ ...draft, price: "" });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const priceRule = result.judgment.rules.find((r) => r.ruleId === "price_is_plausible");
+    expect(priceRule!.outcome).toBe("skipped");
+    expect(Object.keys(recorder.calls[0]!.body.questions)).toHaveLength(ListingRules.length - 1);
+  });
+
   it("何も入力していなければ JEV を呼ばない", async () => {
     const { recorder, service } = setup(answering());
 

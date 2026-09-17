@@ -318,9 +318,14 @@ const isEmptyPayload = (payload) =>
 
 /** 該当フィールドのインラインに出す（全体のバナーは出さない＝まだ出品していないため）。 */
 function showInline(messages) {
+  // 同じフィールドに複数の違反があるときはまとめて出す（上書きしない）
+  const grouped = new Map();
   for (const { field, message } of messages) {
+    grouped.set(field, [...(grouped.get(field) ?? []), message]);
+  }
+  for (const [field, list] of grouped) {
     const node = document.querySelector(`#err-${field}`);
-    if (node) node.textContent = message;
+    if (node) node.textContent = list.join(" ");
   }
 }
 

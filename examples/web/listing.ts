@@ -515,7 +515,13 @@ export function createListingService(deps: ListingServiceDeps) {
      * 形が足りない条件は JEV に聞かない（未入力の値について無駄な判断をさせないため）。
      */
     async precheck(raw: unknown): Promise<PrecheckResult> {
-      const shape = ListingShape.partial().safeParse(raw);
+      // 空欄は「まだ入力していない」として扱う（空文字を数値化すると不正値になってしまうため）
+      const entered = Object.fromEntries(
+        Object.entries(typeof raw === "object" && raw !== null ? raw : {}).filter(
+          ([, value]) => value !== "" && value !== null && value !== undefined,
+        ),
+      );
+      const shape = ListingShape.partial().safeParse(entered);
       if (!shape.success) {
         const fieldErrors: Record<string, string[]> = {};
         for (const issue of shape.error.issues) {
@@ -536,7 +542,7 @@ export function createListingService(deps: ListingServiceDeps) {
           toJSON,
         });
         await captures.run(capture, async () => {
-          const result = await schema.safeParseAsync(raw);
+          const result = await schema.safeParseAsync(entered);
           if (!result.success) issues = getSemanticIssues(result.error);
         });
       }
