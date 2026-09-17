@@ -63,7 +63,7 @@ async function handle(request: IncomingMessage, response: ServerResponse): Promi
   }
 
   if (request.method === "GET" && url.pathname === "/api/reviews") {
-    return sendJson(response, 200, { submissions: service.list() });
+    return sendJson(response, 200, { submissions: await service.list() });
   }
 
   if (request.method === "GET" && url.pathname === "/api/meta") {

@@ -60,7 +60,9 @@ export const ReviewRules: readonly SemanticRule[] = [
     uncertainMessage: "内容が具体的かどうかの判断がつきませんでした。",
     message: "具体的な使用感を書いていただけると、他の方の参考になります。",
     path: ["body"],
-    threshold: 0.85,
+    // 実測では、具体的な良いレビューが 0.70〜0.78、短いだけのレビューが 0.02〜0.10 だった。
+    // 0.85 のままだと良いレビューまで「審査中」に入ってしまうため、実データに合わせて下げている。
+    threshold: 0.65,
   },
 ];
 
@@ -108,11 +110,36 @@ export type SubmitResult =
       readonly formErrors: readonly string[];
     };
 
+/**
+ * 記録の保存先。サーバーではメモリ、Cloudflare Workers では Durable Object を使う。
+ * 並行書き込みを心配しなくて済むよう、`add` は直列に呼ばれる前提でよい（DO は単一インスタンス）。
+ */
+export interface SubmissionStore {
+  add(submission: Submission): Promise<void> | void;
+  list(): Promise<readonly Submission[]> | readonly Submission[];
+}
+
+/** プロセス内のメモリだけに持つ既定のストア（デモ・テスト用）。 */
+export function createMemoryStore(limit = 100): SubmissionStore {
+  const submissions: Submission[] = [];
+  return {
+    add(submission) {
+      submissions.unshift(submission);
+      if (submissions.length > limit) submissions.pop();
+    },
+    list() {
+      return submissions;
+    },
+  };
+}
+
 export interface ReviewServiceDeps {
   readonly mode: ReviewMode;
   readonly apiKey?: string;
   /** テストや --fake で差し替える fetch（省略時はグローバル fetch） */
   readonly fetch?: (input: string, init?: RequestInit) => Promise<Response>;
+  /** 記録の保存先（省略時はメモリ） */
+  readonly store?: SubmissionStore;
   readonly now?: () => Date;
   readonly nextId?: () => string;
   readonly limit?: number;
@@ -126,9 +153,8 @@ interface Capture {
 
 /** フォームの裏側の処理。HTTP からもテストからも同じ経路で呼べる。 */
 export function createReviewService(deps: ReviewServiceDeps) {
-  const submissions: Submission[] = [];
+  const store = deps.store ?? createMemoryStore(deps.limit ?? 100);
   const now = deps.now ?? (() => new Date());
-  const limit = deps.limit ?? 100;
   let sequence = 0;
   const nextId = deps.nextId ?? (() => `RV-${Date.now().toString(36).toUpperCase()}-${++sequence}`);
 
@@ -174,12 +200,6 @@ export function createReviewService(deps: ReviewServiceDeps) {
             ...(review.email ? { email: review.email } : {}),
           }),
         });
-
-  function store(submission: Submission): Submission {
-    submissions.unshift(submission);
-    if (submissions.length > limit) submissions.pop();
-    return submission;
-  }
 
   function buildRecord(
     status: ReviewStatus,
@@ -246,20 +266,20 @@ export function createReviewService(deps: ReviewServiceDeps) {
           else (fieldErrors[field] ??= []).push(issue.message);
         }
         // 差し戻した入力も運用画面には残す（どんな投稿が弾かれたかを見るため）
-        store(buildRecord("rejected", review, issues, capture, id));
+        await store.add(buildRecord("rejected", review, issues, capture, id));
         return { ok: false, fieldErrors, formErrors };
       }
 
       // uncertain / unavailable は受け付けて「審査中」。shadow / off は記録だけで「掲載待ち」。
       const status: "pending" | "review" =
         deps.mode === "enforce" && issues.length > 0 ? "review" : "pending";
-      store(buildRecord(status, review, issues, capture, id));
+      await store.add(buildRecord(status, review, issues, capture, id));
       return { ok: true, id, status };
     },
 
     /** 運用画面用。新しい順。 */
-    list(): readonly Submission[] {
-      return submissions;
+    async list(): Promise<readonly Submission[]> {
+      return await store.list();
     },
   };
 }

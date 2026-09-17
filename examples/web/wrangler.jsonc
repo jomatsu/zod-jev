@@ -1,0 +1,44 @@
+{
+  // zod-jev のデモ（普通のフォーム + 裏で JEV）を Cloudflare Workers にデプロイする設定。
+  //
+  //   npx wrangler deploy --config examples/web/wrangler.jsonc
+  //   npx wrangler secret put TYPESAFE_API_KEY --config examples/web/wrangler.jsonc
+  //
+  // REVIEW_MODE を off にすれば、キーが無くてもデプロイ・起動できる（キルスイッチ）。
+  "$schema": "https://unpkg.com/wrangler/config-schema.json",
+  "name": "zod-jev-demo",
+  "main": "worker.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+  "vars": {
+    "REVIEW_MODE": "enforce",
+    "FAKE_JEV": "0"
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "REVIEW_STORE",
+        "class_name": "ReviewStore"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["ReviewStore"]
+    }
+  ],
+  "routes": [
+    {
+      "pattern": "zod-jev.jomatsu.me",
+      "custom_domain": true
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}

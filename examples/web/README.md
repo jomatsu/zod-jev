@@ -65,7 +65,43 @@ npx tsx examples/web/server.ts --mode=off      # JEV を呼ばない（キルス
 - **送受信の記録はリクエストごとの非同期コンテキスト**（`AsyncLocalStorage`）に閉じ込めています。デモで中身を見せるための仕掛けで、本番では `onResponse` でメトリクスを送るだけにして、利用者の入力を全量保存しないでください。
 - `--fake` は入力の特徴から確率を決めるだけの偽物です。UI と分岐の確認用で、JEV の精度とは関係ありません。
 
+## Cloudflare Workers へのデプロイ
+
+現在 **https://zod-jev.jomatsu.me/**（フォーム）と **https://zod-jev.jomatsu.me/ops**（運用画面）で動いています。
+
+```sh
+# 初回のみ（`wrangler login` 済みのアカウントを使います）
+npx wrangler secret put TYPESAFE_API_KEY --config examples/web/wrangler.jsonc
+
+# デプロイ（package.json のスクリプトでも可: npm run deploy:web）
+npx wrangler deploy --config examples/web/wrangler.jsonc
+
+# ローカルで Workers として動かす（.dev.vars にキーを置く）
+npm run dev:web        # → http://localhost:8788
+```
+
+デプロイの構成:
+
+| 要素 | 内容 |
+| --- | --- |
+| `worker.ts` | Worker のエントリ。`/api/*` を処理し、静的ファイルは Workers Assets に任せる |
+| `wrangler.jsonc` | `compatibility_flags: ["nodejs_compat"]`、Workers Assets、Durable Object、カスタムドメイン |
+| `public/` | Workers Assets として配信。`/ops` は `ops.html` にマップ |
+| `ReviewStore`（Durable Object） | 受け付けた投稿の記録。書き込みが直列になり、isolate をまたいでも記録が揃う |
+| Secret | `TYPESAFE_API_KEY`。ブラウザには渡らない |
+
+### 実測で分かったこと（Cloudflare 固有）
+
+- **受付記録は isolate ごとのメモリに置いてはいけない。** 最初はモジュールスコープの配列で保持していたが、3 件投稿しても運用画面には 1 件しか見えないことがあった（リクエストが別の isolate に当たるため）。Durable Object に永続化して直した。
+- `durable_objects` のバインディングは**名前空間**であり、`.fetch` は直接呼べない。`get(idFromName("reviews"))` でスタブを取る（RPC を使わず HTTP のまま）。
+- ローカルの `wrangler dev` では Secret が使われないので、`examples/web/.dev.vars` に `TYPESAFE_API_KEY` を置く（gitignore 済み）。
+- キー無しでもデプロイできるよう、`REVIEW_MODE=off` のときは JEV のクライアントを作らない（キルスイッチ）。`FAKE_JEV=1` なら偽の判定で課金なしに画面を確認できる。
+- 閾値も実測で調整した。`body_has_specifics` は 0.85 だと具体的な良いレビュー（実測 0.70〜0.78）まで「審査中」になるので、0.65 に下げている。
+
+> 記録には利用者の入力を含む（`state` / `questions` / `answers`）。デモとして見せるための全量保存なので、本番では保持項目を絞るか、`onResponse` のメトリクスだけにする。
+
 ## 制限
 
 - サーバーレンダリング＋メモリ上の記録だけの最小構成です。DB・認証・モデレーション画面の操作（承認/却下）・レート制限はありません。
-- 記録は最大 100 件（`limit`）で、プロセスを再起動すると消えます。
+- Node サーバー版（`server.ts`）の記録はプロセス内のメモリなので、再起動すると消えます（Workers 版は Durable Object に残ります）。
+- 記録は最大 100 件（`limit` / `STORE_LIMIT`）。

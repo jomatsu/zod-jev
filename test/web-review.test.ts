@@ -42,7 +42,7 @@ describe("フォームの裏側（review service）", () => {
     expect(result.fieldErrors.nickname).toEqual(["ニックネームを入力してください"]);
     expect(result.fieldErrors.body).toEqual(["レビュー本文は10文字以上で入力してください"]);
     expect(recorder.calls).toHaveLength(0);
-    expect(service.list()).toHaveLength(0);
+    expect(await service.list()).toHaveLength(0);
   });
 
   it("すべて成立すれば「掲載待ち」で受け付ける", async () => {
@@ -57,7 +57,7 @@ describe("フォームの裏側（review service）", () => {
     // 空のメールは state に載せない
     expect(recorder.calls[0]!.body.state.value).not.toHaveProperty("email");
 
-    const [saved] = service.list();
+    const [saved] = await service.list();
     expect(saved).toMatchObject({ id: "RV-TEST", status: "pending" });
     expect(saved!.review.rating).toBe(5); // coerce 済み
     expect(saved!.jev.questionCount).toBe(ReviewRules.length);
@@ -75,7 +75,7 @@ describe("フォームの裏側（review service）", () => {
       "個人情報は入力しないでください。個別のご相談はお問い合わせフォームからお願いします。",
     ]);
     // 弾いた入力も記録する（どんな投稿が差し戻されたかを見るため）
-    expect(service.list()[0]).toMatchObject({ status: "rejected" });
+    expect((await service.list())[0]).toMatchObject({ status: "rejected" });
   });
 
   it("閾値に届かない条件のパスにエラーを付ける（rating の食い違い）", async () => {
@@ -95,7 +95,7 @@ describe("フォームの裏側（review service）", () => {
     const result = await service.submit(validReview);
 
     expect(result).toMatchObject({ ok: true, status: "review" });
-    const [saved] = service.list();
+    const [saved] = await service.list();
     expect(saved!.issues.map((issue) => issue.details.kind)).toEqual(["uncertain"]);
     expect(saved!.status).toBe("review");
   });
@@ -110,8 +110,8 @@ describe("フォームの裏側（review service）", () => {
 
     expect(result).toMatchObject({ ok: true, status: "pending" });
     expect(recorder.calls).toHaveLength(1);
-    expect(service.list()[0]).toMatchObject({ mode: "shadow", status: "pending" });
-    expect(service.list()[0]!.issues).toHaveLength(1);
+    expect((await service.list())[0]).toMatchObject({ mode: "shadow", status: "pending" });
+    expect((await service.list())[0]!.issues).toHaveLength(1);
   });
 
   it("off は JEV を呼ばず、鍵が無くても動く（キルスイッチ）", async () => {
@@ -120,7 +120,7 @@ describe("フォームの裏側（review service）", () => {
     const result = await service.submit(validReview);
 
     expect(result).toMatchObject({ ok: true, status: "pending", id: "RV-OFF" });
-    const [saved] = service.list();
+    const [saved] = await service.list();
     expect(saved!.issues).toEqual([]);
     expect(saved!.jev.questionCount).toBe(0);
     expect(saved!.jev.questions).toBeNull();
@@ -138,6 +138,6 @@ describe("フォームの裏側（review service）", () => {
     await service.submit(validReview);
     await service.submit(validReview);
 
-    expect(service.list().map((s) => s.id)).toEqual(["RV-3", "RV-2"]);
+    expect((await service.list()).map((s) => s.id)).toEqual(["RV-3", "RV-2"]);
   });
 });

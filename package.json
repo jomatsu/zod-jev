@@ -53,6 +53,8 @@
     "demo": "tsx examples/quickstart.ts",
     "demo:web": "tsx examples/web/server.ts",
     "demo:web:fake": "tsx examples/web/server.ts --fake",
+    "dev:web": "wrangler dev --config examples/web/wrangler.jsonc --local --port 8788",
+    "deploy:web": "wrangler deploy --config examples/web/wrangler.jsonc",
     "check": "npm run typecheck && npm run test && npm run build && npm run check:dist",
     "prepublishOnly": "npm run check"
   },

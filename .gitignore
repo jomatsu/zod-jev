@@ -6,3 +6,5 @@ coverage/
 !.env.example
 *.log
 .DS_Store
+examples/web/.dev.vars
+.wrangler/
