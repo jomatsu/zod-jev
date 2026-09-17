@@ -14,27 +14,27 @@
         <strong>デモ操作パネル</strong>
       </div>
       <p class="demo-note">
-        左側はフリマアプリ風の画面です（JEV の存在は見えません）。<strong>このパネルはアプリの一部ではありません。</strong>
-        ここから例を入れて出品すると、弾かれる様子と裏側の判定が確認できます。
+        左側はフリマアプリの出品画面です（JEV の存在は見えません）。<strong>このパネルはアプリ本体の画面ではありません。</strong>
+        入力例を選んで出品すると、出品が却下される挙動や裏側の判定結果を確認できます。
       </p>
 
       <section class="demo-section">
-        <h3>1. 例を入れる（1クリック）</h3>
+        <h3>1. 入力例を適用（1クリック）</h3>
         <div id="demo-samples" class="demo-samples"></div>
-        <button class="demo-ghost" id="demo-reset" type="button">初期状態（下書き）に戻す</button>
+        <button class="demo-ghost" id="demo-reset" type="button">下書きを初期状態に戻す</button>
       </section>
 
       <section class="demo-section">
-        <h3>2. 直前の出品の判定（裏側）</h3>
+        <h3>2. 直前の出品判定（裏側）</h3>
         <div id="demo-result">
-          <p class="demo-muted">まだ出品していません。左の「出品する」を押してください。</p>
+          <p class="demo-muted">まだ出品されていません。左の「出品する」を押してください。</p>
         </div>
       </section>
 
       <section class="demo-section">
         <h3>3. 詳しく見る</h3>
         <p class="demo-muted">
-          条件の一覧と過去の判定は <a href="/ops">/ops</a> にあります。
+          判定条件の一覧と過去の判定履歴は <a href="/ops">/ops</a> で確認できます。
           <span id="demo-mode"></span>
         </p>
       </section>
@@ -46,7 +46,7 @@
         <span class="wordmark">フリマ</span>
         <input class="global-search" type="text" placeholder="キーワードから探す" disabled />
         <nav class="global-nav">
-          <span>いいね！</span>
+          <span>いいね</span>
           <span>お知らせ</span>
           <span>マイページ</span>
           <span class="avatar"></span>
@@ -79,7 +79,7 @@
                   <div class="photo">＋</div>
                   <div class="photo">＋</div>
                 </div>
-                <p class="hint">最大10枚までアップロードできます（あと6枚追加できます）</p>
+                <p class="hint">最大10枚までアップロードできます（残り6枚）</p>
               </div>
             </div>
 
@@ -190,7 +190,7 @@
       </div>
     </main>
 
-    <footer class="site-footer">フリマアプリ風の画面（この部分はアプリの一部です）</footer>
+    <footer class="site-footer">フリマアプリ画面（この枠内はアプリ本体です）</footer>
 
     </div>
 

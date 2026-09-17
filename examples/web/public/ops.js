@@ -28,7 +28,7 @@ async function refresh() {
 
   document.querySelector("#mode-pill").textContent = `mode=${meta.mode}`;
   document.querySelector("#api-pill").textContent = meta.fake
-    ? "--fake（偽の判定・課金なし）"
+    ? "--fake（模擬判定・課金なし）"
     : `実 API: ${meta.endpoint}`;
   document.querySelector("#count").textContent = `${records.length} 件`;
 
@@ -44,7 +44,7 @@ function renderRules(rules) {
   const table = el("table");
   const head = el("thead");
   const headRow = el("tr");
-  for (const label of ["条件 ID", "成立していてほしい条件（はい で確率が 1 に近づく）", "閾値", "違反時の文言"]) {
+  for (const label of ["条件 ID", "判定条件（「はい」で確率が 1 に近づく）", "閾値", "違反時メッセージ"]) {
     headRow.append(el("th", undefined, label));
   }
   head.append(headRow);
@@ -99,7 +99,7 @@ function probabilityBar(probability, threshold) {
   fill.style.width = `${Math.round(probability * 100)}%`;
   bar.append(fill);
   for (const [value, title] of [
-    [1 - threshold, "却下の下限（1-閾値）"],
+    [1 - threshold, "却下基準（1-閾値）"],
     [threshold, "合格の閾値"],
   ]) {
     const marker = el("div", "marker");
@@ -165,12 +165,12 @@ function renderRecord(record) {
 
   if (record.mode === "shadow") {
     body.append(
-      el("p", "muted", "shadow モードの記録です。この出品は「公開中」のままで、判定は挙動に使っていません。"),
+      el("p", "muted", "shadow モードの記録です。この出品は「公開中」のままで、判定結果は実際の動作に反映されていません。"),
     );
   }
 
   if (record.issues.length === 0) {
-    body.append(el("p", "muted", "意味の条件はすべて成立しています（issue なし）。"));
+    body.append(el("p", "muted", "意味の条件はすべて満たしています（指摘なし）。"));
   } else {
     const issues = el("div");
     for (const issue of record.issues) issues.append(renderIssue(issue));
@@ -190,7 +190,7 @@ function renderRecord(record) {
   body.append(metrics);
 
   const raw = el("details", "raw");
-  raw.append(el("summary", undefined, "JEV に送った内容 / 返ってきた確率"));
+  raw.append(el("summary", undefined, "JEV への送信内容 / 返却された確率"));
   raw.append(
     el(
       "pre",

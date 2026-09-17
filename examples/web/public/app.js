@@ -188,7 +188,7 @@ function renderJudgment(demo) {
   const box = document.querySelector("#demo-result");
   if (demo === null || demo === undefined) {
     box.replaceChildren(
-      el("p", "demo-muted", "まだ判定していません。入力してフォーカスを外すか、出品してください。"),
+      el("p", "demo-muted", "まだ判定結果がありません。入力してフォーカスを外すか、出品してください。"),
     );
     return;
   }
@@ -202,7 +202,7 @@ function renderJudgment(demo) {
       "span",
       "demo-muted",
       demo.origin === "precheck"
-        ? "フォーカスを外した時点（まだ出品していません）"
+        ? "フォーカス離脱時の判定（未出品）"
         : (demo.id ?? ""),
     ),
   );
@@ -278,13 +278,13 @@ function renderJudgment(demo) {
   const verdict =
     demo.origin === "precheck"
       ? demo.rules.some((rule) => rule.outcome === "rejected")
-        ? "→ このままでは出品できません（該当項目に理由が出ています）"
-        : "→ ここまでは問題なし。出品するまで結果は確定しません"
+        ? "→ このままでは出品できません（該当項目に理由を表示）"
+        : "→ 現時点で問題はありません（結果は出品時に確定）"
       : demo.status === "rejected"
-        ? "→ 出品不可（理由は該当項目の下に出る）"
+        ? "→ 出品不可（該当項目の下に理由を表示）"
         : demo.status === "review"
-          ? "→ 審査中（利用者には「審査が終わり次第公開」とだけ出る）"
-          : "→ 公開中（全条件が成立）";
+          ? "→ 審査中（利用者には「審査が終わり次第公開」と表示）"
+          : "→ 公開中（すべての条件を満たしています）";
   box.append(el("p", "demo-verdict", verdict));
 }
 
@@ -437,8 +437,8 @@ async function main() {
   fillSelect("shippingDays", meta.options.shippingDays, "");
   document.querySelector("#fee-rate").textContent = String(Math.round(meta.feeRate * 100));
   document.querySelector("#demo-mode").textContent = meta.fake
-    ? "いまは --fake（偽の判定・課金なし）で動いています。"
-    : "いまは実 API に問い合わせています。";
+    ? "現在は --fake（模擬判定・課金なし）で動作しています。"
+    : "現在は実 API に問い合わせています。";
   renderSamples();
 
   form.addEventListener("submit", submitListing);

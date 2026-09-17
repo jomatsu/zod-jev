@@ -1,161 +1,124 @@
 # zod-jev
 
-Zod 4 のスキーマに [TypeSafe JEV](https://typesafe.ai/)（System One モデル）の**意味検証**を合成する小さなライブラリです。
+[![npm](https://img.shields.io/npm/v/zod-jev.svg)](https://www.npmjs.com/package/zod-jev)
+[![license](https://img.shields.io/npm/l/zod-jev.svg)](./LICENSE)
 
-**形式**（型・必須・フォーマット）は Zod が、**意味**（「個人情報が含まれていない」「ポリシーに適合している」）は JEV の確率的な判定が担当します。1 回の parse につき JEV を **1 リクエストだけ** 呼び、そのスキーマの条件をまとめて判定します。
+**Zod validates the shape. [JEV](https://typesafe.ai/) validates the meaning.**
+
+`zod-jev` composes TypeSafe [JEV](https://typesafe.ai/) (System One) semantic checks into
+[Zod](https://zod.dev) 4 schemas. Shape rules stay in Zod. Judgments that only a model can make
+("does this body contain personal data?", "is this price plausible for this item?", "does the
+category match the description?") become calibrated probabilities that your code can threshold on.
+
+A single `parseAsync` call sends every rule of that schema to JEV in a **single request**, then turns
+the probabilities into Zod issues. Callers continue to use ordinary Zod APIs and error objects.
 
 ```ts
 import { createJevZod, getSemanticIssues } from "zod-jev";
 
-const z = createJevZod(); // TYPESAFE_API_KEY を読む
+const z = createJevZod(); // reads TYPESAFE_API_KEY
 
-const Ticket = z.semantic(
-  z.object({ subject: z.string(), body: z.string() }),
-  [
-    {
-      id: "refund_requested",
-      is: "`value.body` が返金や請求の取り消しを求めている",
-      message: "返金依頼として扱えませんでした。",
-      path: ["body"],
-    },
-    {
-      id: "body_has_no_pii",
-      is: "`value.body` に氏名・メールアドレス・電話番号などの個人情報が含まれていない",
-      message: "本文に個人情報が含まれています。",
-      path: ["body"],
-    },
-  ],
-);
+const Ticket = z.semantic(z.object({ subject: z.string(), body: z.string() }), [
+  {
+    id: "refund_requested",
+    is: "`value.body` asks for a refund or a reversal of a charge",
+    message: "This does not look like a refund request.",
+    path: ["body"],
+  },
+  {
+    id: "body_has_no_pii",
+    is: "`value.body` contains no personal data (name, email, phone, card number, order id)",
+    message: "Please remove personal data from the message.",
+    path: ["body"],
+  },
+]);
 
 const result = await Ticket.safeParseAsync({
-  subject: "二重請求",
-  body: "A-104 の注文で二重に請求されています。重複分を返金してください。",
+  subject: "Duplicate charge",
+  body: "I was charged twice for order A-104. Please refund the duplicate.",
 });
 
 if (!result.success) {
   for (const issue of getSemanticIssues(result.error)) {
-    console.log(issue.path.join("."), issue.message, issue.details.kind);
+    console.log(issue.path.join("."), issue.details.kind, issue.message);
   }
 }
 ```
 
-- 形式は Zod、意味は JEV。Zod のエコシステム（`z.object` / `z.array` / `safeParse`）をそのまま使えます。
-- 条件は 1 つのリクエストにまとめて送るので、条件を増やしてもレイテンシはほとんど増えません（JEV は質問を並列・独立に評価する）。
-- 判定できないことを「合格」にしません（fail-closed）。`unavailable` も issue になります。
-- 実 API で動作を確認済み（`test/integration/`、2026-09-17 / `jev-1.13.0`）。
+- **No new schema dialect.** `semantic()` returns the *same* schema type as your base schema with an
+  extra async check. Methods such as `.extend()`, `.strict()`, and `z.toJSONSchema()` continue to work.
+- **One request per parse.** JEV answers all questions about the same state in parallel, so adding
+  rules barely changes latency (the official documentation calls this "speculative fan-out").
+- **Fail closed.** If zod-jev cannot obtain a judgment (`unavailable`), it reports an issue. It never
+  silently treats an unavailable judgment as a pass.
+- Verified against the live API: 78 unit tests plus opt-in integration tests (`test/integration/`).
 
-## インストール
+> The detailed design notes and the migration guide are currently written in Japanese
+> ([docs/jev.md](https://github.com/jomatsu/zod-jev/blob/main/docs/jev.md),
+> [docs/adoption.md](https://github.com/jomatsu/zod-jev/blob/main/docs/adoption.md)).
+> 日本語の README は [README.ja.md](https://github.com/jomatsu/zod-jev/blob/main/README.ja.md) です。
+> Live demo: **https://zod-jev.jomatsu.me/**
+
+## Why
+
+Zod excels at checks that a grammar can decide: types, required fields, length, format, and enums.
+However, it cannot determine whether a free-text field is *acceptable*:
+
+| Check | Zod | zod-jev (JEV) |
+| --- | --- | --- |
+| `body` is a string of 10–1000 chars | ✅ | |
+| `body` contains no personal data | | ✅ `p = 0.02` → reject |
+| The description matches the chosen category | | ✅ `p = 0.05` → reject |
+| The price is plausible for this item | | ✅ `p = 0.87` → not sure, ask a human |
+| The text asks for a refund | | ✅ (usually a `choice`/`score` job — see below) |
+
+JEV returns **probabilities, not prose**. You do not need prompt engineering to parse a string,
+and you do not need a "JSON mode" that might drift. Each decision provides a calibrated confidence
+value that you can threshold.
+
+## Install
 
 ```sh
 npm install zod-jev zod
 ```
 
-- Node.js 20 以上（公式 SDK の要件）
-- `zod@^4.3.0`（4.3.0 と 4.6.5 で CI 相当のテストを実行済み）
-- TypeSafe の API キー（[console.typesafe.ai](https://console.typesafe.ai/) で発行）
+- Node.js 20 or newer
+- `zod@^4.3.0` (zod-jev excludes 4.0–4.2 because deriving a schema in those versions silently *drops* refinements)
+- A TypeSafe API key: create one at [console.typesafe.ai](https://console.typesafe.ai/), then run
+  `export TYPESAFE_API_KEY=...`
 
-> 下限を 4.3 にしているのは、zod 4.0〜4.2 では `.pick()` / `.omit()` / `.partial()` / `.merge()` が **refine を黙って落とす**（＝semantic 検証が消える）ためです。4.3 以降は Zod が同じ操作を例外で拒否します。
+JEV is an early-access hosted model. TypeSafe bills requests by input tokens (at the time of writing,
+output tokens are counted but not charged). A validation with a handful of rules costs a fraction of
+a cent. See [Pricing and latency](#pricing-and-latency).
 
-```sh
-export TYPESAFE_API_KEY="apikey_..."
+## How it works
+
+```
+your value ──► Zod (shape)                     ──► JEV (meaning)                       ──► Zod issues
+                types / required / format         noul questions, one request, parallel
 ```
 
-## クイックスタート
+1. `semantic(base, rules)` attaches one async refinement to `base` **after** its shape checks run.
+2. The refinement sends `state = { value, context? }` and one `noul` question per rule:
+   `{ type: "noul", instructions: { question, judge, note }, criteria: { true, false } }`.
+3. Every rule receives a probability. If `p >= threshold`, the rule passes. If `p <= 1 - threshold`,
+   the outcome is `rejected`. Any value in between is `uncertain`. If zod-jev cannot obtain a result,
+   the outcome is `unavailable`.
 
-```ts
-import { createJevZod, getSemanticIssues } from "zod-jev";
-
-const z = createJevZod({
-  // apiKey を省略すると TYPESAFE_API_KEY を読む
-  onResponse: (info) => console.log("jev cost:", info), // モデル・トークン・レイテンシ
-});
-
-const Review = z.semantic(
-  z.object({ star: z.number().int().min(1).max(5), comment: z.string() }),
-  [
-    {
-      id: "comment_matches_rating",
-      is: "`value.comment` の内容が `value.star` の評価と矛盾していない",
-      message: "コメントと星の数が食い違っています。",
-      path: ["comment"],
-      // 判断が割れやすい条件は閾値を下げて「合格」に寄せる（既定は 0.95）
-      threshold: 0.8,
-    },
-  ],
-  { context: { guideline: "星 5 は賛辞のみ。不満が書かれていれば矛盾とみなす。" } },
-);
-
-const result = await Review.safeParseAsync({ star: 5, comment: "普通でした。" });
-// result.success === false
-// getSemanticIssues(result.error) -> [{ path: ["comment"], details: { kind: "uncertain", ... } }]
-```
-
-`semantic()` を付けたスキーマは **非同期** になります。`parse` / `safeParse` ではなく `parseAsync` / `safeParseAsync` を使ってください（同期 parse は Zod が例外を投げます）。
-
-## JEV の前提（ここだけは知っておく）
-
-このライブラリの設計は JEV の次の性質に合わせてあります（出典は [docs/jev.md](docs/jev.md)）。
-
-| 性質 | このライブラリへの影響 |
-| --- | --- |
-| 質問は **Noul（はい/いいえ）・Choice・Score** の 3 種類だけ | ルールは Noul 1 種類に変換する。yes で確率が 1 に近づく問いを書く |
-| Noul の答えは `noul`（P(はい) の 0〜1）。**`confidence` は付かない** | 閾値は `noul` に直接かける。Choice/Score の confidence とは別物 |
-| 質問キーはモデルに送られない | 質問文は単体で意味が通る必要がある（`instructions` を構造化して補う） |
-| 質問は同じ state に対して**並列・独立**に評価され、増やしてもレイテンシはほぼ変わらない | 1 parse = 1 リクエストに全部まとめる（投機的ファンアウト） |
-| `state` と `questions` が **約 32,000 トークン（≈150,000 文字）** を共有する | 超えたら API を叩かず `state_too_large` で落とす |
-| 429 / 529 はバックオフが必要 | 公式 SDK のリトライ（408・429・5xx、`Retry-After` 尊重、既定 2 回）に委譲 |
-
-## API
-
-### `createJevZod(config?)`
-
-Zod の全 API に `semantic` と `semanticArray` を足したオブジェクトを返します（`const z = createJevZod()` としてそのまま使えます）。
-
-| 設定 | 既定 | 説明 |
+| Probability `p` vs. threshold `t` | Outcome | Meaning |
 | --- | --- | --- |
-| `apiKey` | `TYPESAFE_API_KEY` | TypeSafe の API キー |
-| `baseURL` | `TYPESAFE_BASE_URL` → `https://api.typesafe.ai` | API のルート |
-| `model` | `TYPESAFE_DEFAULT_MODEL` → `jev-latest` | リクエストごとに指定（注入したクライアントの既定より優先） |
-| `threshold` | `0.95` | 既定の閾値。`0.5 < t <= 1` |
-| `timeoutMs` | SDK と同じ `10000` | 1 回の試行のタイムアウト |
-| `maxRetries` | SDK と同じ `2` | 初回を除くリトライ回数 |
-| `retry` | — | SDK の `RetryPolicy` の部分上書き |
-| `fetch` | グローバル `fetch` | テスト・独自トランスポート用 |
-| `client` | — | 構成済みクライアントの注入（指定時は上の接続系設定は無視） |
-| `logLevel` | SDK と同じ `warn` | 公式 SDK のログ |
-| `maxStateCharacters` | `150000` | state + questions の文字数上限 |
-| `onClientError` | `"throw"` | リトライで直らない 4xx を例外にするか `unavailable` の issue にするか |
-| `onResponse` | — | `{ model, inputTokens, outputTokens, latencyMs, questionCount }` を受け取るフック |
-| `messages` | 日本語の既定文言 | `uncertain` / `unavailable` の文面を差し替え |
+| `p >= t` | pass | no issue |
+| `p <= 1 - t` | `rejected` | the opposite is as confident as a pass would be — your `message` is shown |
+| otherwise | `uncertain` | cannot tell; ask a human (`uncertainMessage`) |
+| not obtained | `unavailable` | network, timeout, malformed response — **never a pass** |
 
-設定の誤り（閾値の範囲外、rule の重複、JSON でない `context` など）は構築時に `JevConfigError`（`TypeError` の派生）として投げます。**入力データのエラーとは区別**されます。
+Both `rejected` and `uncertain` fail the parse. The difference is `details.kind`, which lets you route
+the result (auto-reject versus human review) without re-parsing.
 
-### `semantic(base, rules, options?)`
+### Question keys are never sent to the model
 
-`base` の入出力型を保ったまま、後段に JEV 検証を足します。
-
-```ts
-const Schema = z.semantic(z.object({ ... }), [ ...rules ], {
-  context: { policy: "..." },   // 参考情報。state に `context` として入る
-  toJSON: (value) => ({ ... }), // Date / Map など JSON でない型の変換
-  signal: controller.signal,    // キャンセル
-});
-```
-
-`rules[]` の各項目:
-
-| フィールド | 必須 | 説明 |
-| --- | --- | --- |
-| `id` | ✔ | 条件 ID。スキーマ内で一意。issue の `params.semantic.ruleId` になる |
-| `is` | ✔ | 成立してほしい条件。「はい」で確率が 1 に近づく問いとして書く |
-| `message` | ✔ | `rejected` のときに表示する開発者定義のメッセージ |
-| `path` | — | このスキーマからの相対パス。issue の位置に使う（式の抽出には使わない） |
-| `threshold` | — | 個別の閾値（既定は設定の `threshold`） |
-| `uncertainMessage` | — | `uncertain` のときのメッセージ |
-| `instructions` | — | JEV に送る `instructions` 全体の差し替え（文字列 / オブジェクト / 配列） |
-| `criteria` | — | Noul の `criteria.true` / `criteria.false` の差し替え |
-
-既定では、`state` は `{ value: <パース済みの値>, context?: <options.context> }` になり、各ルールは次の `instructions` に変換されます。質問キーは `q0`, `q1`, …（モデルには送られません）。
+JEV uses your rule IDs only to match answers back to questions. The model sees only `instructions`
+and `criteria`. Each rule must therefore stand on its own. By default, `zod-jev` sends:
 
 ```json
 {
@@ -166,23 +129,76 @@ const Schema = z.semantic(z.object({ ... }), [ ...rules ], {
 }
 ```
 
-`criteria` の既定は「明確に成立している / 明確に成立していない（状態に書かれていない・曖昧な場合はどちらでもない）」です。これは**判断保留を確率の端に寄せない**ためで、3 つ目の結末（`uncertain`）を意味のあるものにします。
+`zod-jev` derives `criteria.true` and `criteria.false` so that "not enough evidence" does not collapse
+into "no". This keeps the `uncertain` band meaningful. You can override either field with
+`rule.instructions` or `rule.criteria`.
 
-### `semanticArray(base, rules, options?)`
+## API
 
-配列の**各要素**を JEV で検証します。要素をまとめて 1〜数リクエストに載せるので、`z.array(z.semantic(...))` のように要素数ぶん呼び出す必要がありません。
+### `createJevZod(config?)`
+
+`createJevZod` returns the full Zod API plus `semantic` and `semanticArray`. You can replace your
+`z` import with `const z = createJevZod()`. If you prefer to keep using plain `zod`, destructure
+the functions:
 
 ```ts
-const Ads = z.semanticArray(z.object({ headline: z.string() }), [ ...rules ], {
-  maxQuestionsPerRequest: 64, // 既定 128。超えたらリクエストを分割する
+import * as Z from "zod";
+import { createJevZod } from "zod-jev";
+
+const { semantic } = createJevZod();
+const Checked = semantic(Z.object({ body: Z.string() }), rules);
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `apiKey` | `TYPESAFE_API_KEY` | TypeSafe API key |
+| `baseURL` | `TYPESAFE_BASE_URL` → `https://api.typesafe.ai` | API root |
+| `model` | `TYPESAFE_DEFAULT_MODEL` → `jev-latest` | Sent per request |
+| `threshold` | `0.95` | Default acceptance threshold (`0.5 < t <= 1`) |
+| `timeoutMs` | `10000` (SDK default) | Per attempt |
+| `maxRetries` | `2` (SDK default) | Retries after the first attempt |
+| `retry` | — | Partial `RetryPolicy` override from the official SDK |
+| `fetch` | global `fetch` | Custom transport (used in tests) |
+| `client` | — | Pre-configured client; ignores the connection options above |
+| `logLevel` | `warn` | SDK logging |
+| `maxStateCharacters` | `150000` | `state` + `questions` budget (≈32k tokens) |
+| `onClientError` | `"throw"` | Non-retryable 4xx: throw, or report as `unavailable` |
+| `onResponse` | — | `{ model, inputTokens, outputTokens, latencyMs, questionCount }` |
+| `messages` | Japanese strings | Override `uncertain` / `unavailable` wording |
+
+Misconfiguration (such as duplicate rule IDs, a threshold out of range, or a non-JSON `context`)
+throws `JevConfigError` (a `TypeError`) **at construction time**, never as an input error.
+
+### `semantic(base, rules, options?)`
+
+```ts
+const Checked = z.semantic(base, rules, {
+  context: { policy: "…" },        // reference material, sent as state.context
+  toJSON: (value) => ({ … }),      // convert Date/Map/class instances to JSON
+  signal: controller.signal,       // cancellation (aborts are re-thrown, not turned into issues)
 });
 ```
 
-issue のパスは `[要素の添字, ...rule.path]` です。1 リクエストには**そのリクエストの要素だけ**が `value` として入るため、**要素をまたぐ条件は書けません**（他の要素と比較したい場合は `semantic()` で配列全体を検証してください）。
+| Rule field | Required | Description |
+| --- | --- | --- |
+| `id` | ✅ | Stable id, unique within the schema; appears as `details.ruleId` |
+| `is` | ✅ | The condition that should hold, phrased so that "yes" is a high probability |
+| `message` | ✅ | Message used for `rejected` |
+| `path` | — | Issue path relative to this schema |
+| `threshold` | — | Per-rule threshold |
+| `uncertainMessage` | — | Message used for `uncertain` |
+| `instructions` | — | Replace the whole JEV `instructions` value (string, object, array) |
+| `criteria` | — | Replace the Noul `criteria.true` / `criteria.false` descriptions |
+
+### `semanticArray(base, rules, options?)`
+
+`semanticArray` validates every element of an array. To minimize network requests, it packs elements
+into as few requests as possible (`maxQuestionsPerRequest`, default 128) instead of sending one request
+per element. Issue paths follow the format `[elementIndex, ...rule.path]`. Because each request carries
+only its own slice of the array as `value`, rules cannot compare elements against each other. Use
+`semantic()` on the whole array for cross-item conditions.
 
 ### `getSemanticIssues(error)`
-
-`ZodError` から JEV 由来の issue だけを取り出します。形式エラーと意味エラーを分けて扱いたいときに使います。
 
 ```ts
 type SemanticIssue = {
@@ -194,239 +210,116 @@ type SemanticIssue = {
 };
 ```
 
-## 判定の 3 つの結末
+`getSemanticIssues` separates JEV judgments from standard Zod issues so you can log or route them
+separately.
 
-各条件について、`noul`（P(条件が真)）と閾値 `t` から次のように決まります。
+The package also exports: `DEFAULT_THRESHOLD`, `DEFAULT_MAX_STATE_CHARACTERS`,
+`DEFAULT_MAX_QUESTIONS_PER_REQUEST`, `DEFAULT_CRITERIA`, `defaultMessages`, `JevConfigError`, the
+`JevZodConfig` / `SemanticRule` / `JudgmentView`-style types, and the SDK error classes
+(`APIError`, `RateLimitError`, `AuthenticationError`, …) for `catch` blocks.
 
-| 確率 | 結末 | 意味 |
+## Thresholds
+
+Measured with `jev-1.13.0` (2026-09-17) using one request with several conditions:
+
+| Condition | `noul` | With `t = 0.95` |
 | --- | --- | --- |
-| `p >= t` | 合格 | issue を出さない |
-| `p <= 1 - t` | `rejected` | 「いいえ」側が同じ確信度で成立。`rule.message` を出す |
-| それ以外 | `uncertain` | 肯定とも否定とも言い切れない。確認を促す（`uncertainMessage`） |
-| 判定不能 | `unavailable` | 通信・応答・入力の問題。**合格にはしない** |
+| "the message asks for a refund" (clear) | `0.99` | pass |
+| "contains an email address or a phone number" (clearly no) | `0.02` | `rejected` |
+| "is urgent" (undefined term) | `0.55` | `uncertain` |
+| "is well written" (subjective) | `0.94` | `uncertain` |
 
-`rejected` と `uncertain` は**どちらも parse を失敗させます**。違いは `details.kind` と文言で、ルーティング（自動却下 / 人によるレビュー）を分けたいときに使います。
+- The default threshold of `0.95` is deliberately strict. When the model reports "probably yes"
+  (0.90–0.94), zod-jev still treats it as `uncertain`. Most projects start around `0.9` and lower
+  specific rules to `0.8` when they should rarely block.
+- Rejection is symmetric on purpose: **lowering a threshold widens the auto-reject band**
+  (`p <= 1 - t`). If you want questionable inputs to reach a human reviewer instead of being rejected,
+  keep the threshold high.
+- Tune thresholds on your own data. The `uncertain` band ensures that "not sure" remains a first-class
+  outcome rather than a silent pass or a false rejection.
 
-### 実測（2026-09-17 / `jev-1.13.0`）
+## Caveats
 
-1 リクエストに複数の条件を載せたときの実際の `noul`:
+- **Async only.** These schemas require `parseAsync` or `safeParseAsync`. Calling `parse` or `safeParse`
+  throws `Encountered Promise during synchronous parse`. Because the returned type matches your base type,
+  the compiler cannot warn you. Check your call sites.
+- **One request per parse.** Nested schemas multiply requests: `z.array(z.semantic(…))` sends one
+  request per element. Use `semanticArray` instead.
+- **Budget.** `state` and `questions` share ~32,000 tokens (≈150,000 characters). If input exceeds this
+  budget, zod-jev reports it as `unavailable` (`state_too_large`) before making any request.
+- **JSON values only.** Pass `options.toJSON` for `Date`, `Map`, class instances, and similar types.
+  Otherwise, you receive `not_json`.
+- **Apply `semantic()` last.** `semantic()` evaluates the value *after* your transformations run.
+  Zod 4.3+ refuses schema derivations from a refined object (`.pick()`, `.omit()`, `.partial()`,
+  `.merge()`). Derive the shape first, then attach `semantic()`.
+- **Sibling shape errors do not stop a request.** If another field in the parent object fails, the
+  refinement for this field still runs because Zod does not notify child fields of parent failures.
+  Parse the base shape first if you want to avoid the call.
+- **Server-side only.** The official SDK refuses to run in browsers. Never expose your API key to a web page.
+- **Not a text generator.** JEV returns typed decisions, not prose. For classifications or ordered
+  ratings, use the raw SDK's `choice` / `score` questions.
 
-| 条件 | 確率 | 既定（t=0.95）での結末 |
-| --- | --- | --- |
-| 「このメッセージは返金を求めている」（明確） | `0.99` | 合格 |
-| 「メールアドレスか電話番号を含む」（明確に No） | `0.02` | `rejected` |
-| 「緊急性を伝えている」（定義が曖昧） | `0.55` | `uncertain` |
-| 「文章が整っている」（主観的） | `0.94` | `uncertain` |
+## Pricing and latency
 
-### 閾値の選び方
+Measured on the live API (`jev-1.13.0`, 6 conditions plus a guidelines context):
 
-- 既定の `0.95` は **fail-closed 側にかなり厳しい** 値です。上の表のように、モデルが「たぶん Yes」と言っている `0.90〜0.94` も `uncertain` として落ちます。
-- 実務では `0.9` 前後から始め、落としたくない条件は `0.8` まで下げる、という調整が現実的です（`rule.threshold` で個別に指定できます）。
-- `1 - threshold` を `rejected` の下限にしているのは意図的です。`t = 0.9` なら `p <= 0.1` で「明確な No」、`0.1 < p < 0.9` は「判断保留」になります。閾値を下げるほど `rejected` の範囲も広がります。
-- 閾値はドメインとデータで決めるものです。JEV 側の指針も「まず保守的に始めて、自分のデータで調整する」としています。
+- input ≈ **2,000 tokens ≈ $0.00008** per validation, latency **160–470 ms** (one request,
+  independent of the number of rules)
+- JEV launch pricing is $42 per billion input tokens; output tokens are counted but not charged
 
-## 失敗の扱い
+`onResponse` provides the model, token counts, latency, and question count for every request. The demo
+deployment records these values on its `/ops` page.
 
-- **fail-closed**: タイムアウト・接続エラー・429/5xx のリトライ後の失敗・応答の形が違う・回答の欠落は、例外ではなく `unavailable` の issue になります。意味を確認できない入力を黙って通しません。
-- **設定エラーは例外**: 401（キー不正）や 422（リクエスト不正）などリトライで直らない 4xx は既定で例外（`AuthenticationError` / `UnprocessableEntityError` など）です。issue にしたい場合は `onClientError: "issue"`。
-- **キャンセルは投げ直す**: `options.signal` による中断（`APIUserAbortError`）は検証結果にせず、そのまま `safeParseAsync` の reject になります。
-- **機密を漏らさない**: `unavailable` のメッセージに例外本文や応答本文は含めません（理由コードと HTTP ステータスまで）。応答に含まれる利用者のデータがログや画面に出るのを避けるためです。
-- **文言の差し替え**: `messages.uncertain` / `messages.unavailable` を渡すと文面を置き換えられます。
-- **観測**: `onResponse` でモデル・トークン・レイテンシ・質問数を取得できます。JEV の input は $42 / 10 億トークン、output は課金対象外（発表時点の価格）なので、コストはここで把握できます。
+## Testing
 
-## 既存の Zod プロダクトへの入れ方
-
-すでに `import { z } from "zod"` を使っているプロダクトを想定した場合の、実際の摩擦は次のとおりです。
-動く実例と段階的な移行手順は [docs/adoption.md](docs/adoption.md) にあり、次のコマンドで実行できます。
-
-```sh
-npx tsx examples/adoption/run.ts          # 偽 fetch（鍵不要・課金なし）
-npx tsx examples/adoption/run.ts --live   # 実 API
-```
-
-### 1. `z` を差し替えず、`semantic` だけ持ち込める
-
-```ts
-// 既存コードはそのまま（import { z } from "zod" を維持）
-import * as Z from "zod";
-import { createJevZod } from "zod-jev";
-
-const { semantic } = createJevZod(); // ここだけ zod-jev
-
-const Checked = semantic(Z.object({ body: Z.string() }), [ ...rules ]);
-```
-
-`createJevZod()` は「zod 全部 + `semantic`」を返しますが、分割代入すれば必要な関数だけ使えます。
-`z` を全ファイルで置き換える必要はありません。
-
-> クライアントは `createJevZod()` を呼んだ時点で作られます。API キーが無いと **その場で例外**になるので、モジュールスコープ1箇所（例: `src/jev.ts`）で作って共有するか、キーをテスト環境にも置いてください。
-
-### 2. 残るもの / 残らないもの
-
-返り値は `base` **と同じ型**のスキーマ（非同期の refine が 1 つ増えた clone）なので、Zod の API がそのまま使えます。
-
-| 操作 | 結果 |
-| --- | --- |
-| `result.data` の型・`.transform()` の結果 | そのまま（`ZodSemantic<S> = S`） |
-| `.safeExtend()` / `.strict()` / `.passthrough()` / `.catchall()` / `.required()` / `.optional()` / `.array()` | 使える（refine も引き継ぐ） |
-| `.extend()` | zod 4.6 以降は使える。4.3〜4.5 は `.safeExtend()` を使う（Zod が `.extend()` を拒否する） |
-| `z.toJSONSchema(schema)` | 使える。base の形を返す（構造化出力のヘルパーと併用可） |
-| `.pick()` / `.omit()` / `.partial()` / `.merge()` | **Zod 4 本体が拒否する**（`.pick() cannot be used on object schemas containing refinements`）。refine を安全に移せないためで、zod-jev 固有ではありません |
-
-`.pick()` などを使いたい場合は **先に形を絞ってから** `semantic()` を付けます。
-
-```ts
-const Changed = semantic(Base.pick({ body: true }), rules); // ○
-// const Changed = semantic(Base, rules).pick({ body: true }); // × Zod が拒否
-```
-
-### 3. 一番の注意点: `parseAsync` へ移す必要がある
-
-非同期検証なので、そのスキーマを通る parse は `parseAsync` / `safeParseAsync` が必須です。
-**型では検知できません**（`ZodSemantic<S> = S` なので、エディタ上は今までどおりに見える）。既存の `schema.parse(input)` は **実行時**に `Encountered Promise during synchronous parse` で落ちます。
-
-移行の現実的な手順:
-
-1. `parse(` と `safeParse(` をリポジトリで検索し、`semantic()` を通る経路を洗い出す
-2. 非同期に変えられない箇所（同期のコンテキスト、フレームワークが同期 parse を呼ぶ箇所）では、**base の parse と意味検証を分ける**（下記 4）
-3. 構造化出力のようにスキーマを JSON Schema へ変換するだけの統合は、変換自体は壊れないので影響なし
-
-### 4. ホットパスには置かず、層を分けるのが安全
-
-1 回の parse は **HTTP リクエスト 1 回**（実測 0.6〜0.9 秒、約 $0.00003）です。リクエストハンドラの内部に埋め込むと、遅延・課金・障害点が増えます。
-
-```ts
-// 形（Zod）と意味（JEV）を分けて呼ぶ。既存コードを壊さず、失敗時に入力を使い続けられる。
-const shape = z.object({ body: z.string() });
-const audited = z.semantic(shape, rules);
-
-const value = shape.parse(input);                       // 今までどおり同期でよい
-const result = await audited.safeParseAsync(input);     // 意味検証は明示的に await
-if (!result.success) enqueueForReview(getSemanticIssues(result.error));
-```
-
-この形なら、JEV 側の失敗（`unavailable`）を「検証できなかった」として記録しつつ、形式が正しい入力はそのまま業務に流せます。
-
-### 5. テストとエラー表示
-
-- **テスト**: `semantic()` を通るコードは、そのままだと実 API を叩きます。ユニットテストでは `fetch` か `client` を差し替えてください（SDK のリトライ・ヘッダ・エラー分類はそのまま本物が動きます）。
-- **エラー表示**: 意味エラーの issue は `code: "custom"` で、日本語の `message` が `flatten()` にも出ます。既存のエラー整形が `code` で分岐している場合は、`getSemanticIssues(error)` で JEV 由来だけを取り出して別扱いにすると安全です。
-- **ブラウザ**: 公式 SDK がブラウザ実行を拒否するので、`semantic` を使うモジュールはサーバー専用に分けてください（フロントと同じスキーマ定義を共有している場合は特に）。
-- **zod 3 は非対応**: peer は `zod@^4.3.0` です。zod 3 のプロダクトは zod 4 への移行が先になります（4.0〜4.2 も、refine を黙って落とす操作があるため下限から外しています）。
-
-## 制約と落とし穴
-
-- **非同期必須**: `parse` / `safeParse` は使えません（Zod が `Encountered Promise during synchronous parse` を投げます）。`parseAsync` / `safeParseAsync` を使ってください。
-- **1 parse = 1 リクエスト**: 条件はすべて同じリクエストに載ります。逆に、`z.array(z.semantic(...))` のように**スキーマを入れ子にすると要素数ぶんのリクエスト**になります。配列は `semanticArray` を使ってください。
-- **state のサイズ**: `state` + `questions` で約 32,000 トークン（≈150,000 文字）。超えると `state_too_large` で落ちます（`maxStateCharacters` で調整可）。
-- **`semantic()` は最後に付ける**: 変換（`.transform()` など）まで済んだ値を検証します。`z.semantic(z.object({...}).optional())` のように `undefined` を通し得るスキーマに付けると `not_json` になります。また `.pick()` / `.omit()` / `.partial()` / `.merge()` は refine 付きスキーマでは Zod が拒否するので、先に適用してください。
-- **兄弟フィールドの形式エラーでも判定は走る**: `z.object({ id: z.number(), check: semanticSchema })` に `id: "1"` を渡すと、全体は形式エラーで落ちますが `check` に対する JEV 呼び出しは発生します（Zod は親の失敗を子に伝えないため）。無駄な課金を避けたい場合は、base を先に parse してから semantic 層を別に実行してください。
-- **JSON に落ちる値だけ**: `Date` / `Map` / `Symbol` などは `options.toJSON` で変換してください。Zod で `z.date()` を通していても、その後段は JSON に変換する必要があります。
-- **配列は直列に処理**: 分割したリクエストは順に送ります（1 要素ずつの並列呼び出しでレート制限を踏まないため）。
-- **ブラウザでは動かさない**: API キーが露出するため、公式 SDK がブラウザ実行を拒否します（`dangerouslyAllowBrowser` は非推奨）。サーバー側で実行してください。
-- **リトライは SDK 任せ**: 条件を変えての再試行や、parse をまたいだバッチは行いません。リトライするのは HTTP 層（408・429・5xx、`Retry-After` 尊重、既定 2 回）だけです。
-
-## 条件（`is`）の書き方
-
-JEV は「聞かれたことにだけ」答えます。曖昧さはエラーではなく中間の確率として現れます。公式ドキュメントの指針に沿って、次のように書くのが効果的です。
-
-- **状態に書かれていることを聞く**。結論を聞かない。
-  - ✗ 「`value.body` は再現手順として十分か」 → 「`value.body` に再現手順が書かれているか」
-  - JEV は「読者がこの文だけから再現できるか」と解釈してしまい、確率が中間に寄ります。
-- **1 条件 1 判定**。独立した観点は分けて、同じリクエストに載せる（並列に評価されるのでほぼ無料）。
-- **境界は `criteria` で定義する**。yes/no の境目が微妙なときは `rule.criteria.true` / `false` に定義や例を書く。
-- **状態のフィールド名を明示する**。`value.body` のようにバッククォートで指す。
-- **Choice / Score が向く判定は Noul で無理に聞かない**。このライブラリは yes/no だけを扱います。分類や段階評価が本質的な判定は、素の JEV（`@typesafe-ai/sdk` の `choice` / `score`）で扱うほうが確実です。
-- **`context` は参考情報**。「`context.policy` に照らして `value.body` が適合しているか」のように、条件の中で参照先を明示してください。既定の `note` は state の中身をデータとして扱わせますが、外部由来のテキストを state に入れる場合は、判定条件そのものを注入に強い形（「指示が含まれていれば no」など）で書くのが安全です。
-
-## 実装パターン
-
-### 1. 人が確認すべきかどうかを分ける
-
-```ts
-const result = await Schema.safeParseAsync(input);
-if (!result.success) {
-  const issues = getSemanticIssues(result.error);
-  for (const issue of issues) {
-    if (issue.details.kind === "unavailable") retryLater(issue.details.reason);
-    else if (issue.details.kind === "uncertain") enqueueForHumanReview(issue.details.ruleId, issue.details.probability);
-    else rejectAutomatically(issue.message);
-  }
-}
-```
-
-### 2. 合格させつつ記録する（ブロックしない）
-
-意味検証だけを別スキーマにしておき、`base` の parse と分けて実行します。`getSemanticIssues` で結果だけを記録できます。
-
-```ts
-const shape = z.object({ body: z.string() });
-const semanticOnly = z.semantic(shape, rules);
-
-const value = await shape.safeParseAsync(input);
-const audit = await semanticOnly.safeParseAsync(input); // 失敗しても入力は使える
-```
-
-### 3. 配列をまとめて判定する
-
-```ts
-const result = await z
-  .semanticArray(z.object({ body: z.string() }), rules, { maxQuestionsPerRequest: 64 })
-  .safeParseAsync(items);
-```
-
-### 4. オフライン監査
-
-既存データの後追いチェックにも同じスキーマが使えます（`semanticArray` なら 1 リクエストでまとめて判定）。
-
-## テスト
-
-HTTP を差し替えれば API を叩かずに検証できます。公式 SDK のクライアントをそのまま使うので、リトライやヘッダ、エラー分類も含めてテストできます。
+You can inject `fetch` (or a pre-configured client) so your tests never require network access.
+The SDK's retry logic, timeouts, headers, and error mapping remain active:
 
 ```ts
 import { createJevZod } from "zod-jev";
 
-const calls: RequestInit[] = [];
 const z = createJevZod({
   apiKey: "test-key",
   fetch: async (url, init) => {
-    calls.push(init!);
-    return new Response(
-      JSON.stringify({ model: "jev-latest", answers: { q0: { type: "noul", noul: 0.99 } } }),
-      { headers: { "content-type": "application/json" } },
-    );
+    // inspect init.body ({ state, questions }) and answer with { model, answers, usage }
+    return new Response(JSON.stringify({ model: "jev-latest", answers: {} }), {
+      headers: { "content-type": "application/json" },
+    });
   },
   retry: { backoffInitialMs: 0 },
 });
 ```
 
-- テスト用のハーネスは `test/helpers.ts` にあります（フェイク `fetch`、質問ごとの確率指定、タイムアウト再現）。
-- 実 API の疎通テストは `test/integration/` にあり、既定の `npm test` では走りません:
+Integration tests call the real API and are opt-in:
 
 ```sh
-TYPESAFE_API_KEY=apikey_... npm run test:integration
-# .env に書いておけば読み込まれます
+TYPESAFE_API_KEY=apikey_... npm run test:integration   # or put it in .env
 ```
 
-## 開発
+## Development
 
 ```sh
-npm run check            # typecheck + unit test + build + dist の読み込み確認
-npm run test:integration # 実 API（課金あり・数リクエスト）
-npm run demo             # examples/quickstart.ts を実行
+npm run check             # tsc + 78 unit tests + dual ESM/CJS build + dist smoke test
+npm run test:integration  # real API (a few requests)
+npm run demo              # minimal example
+npm run demo:web:fake     # the demo app with a fake JEV (no key, no billing)
+npm run demo:web          # the demo app against the real API
+npm run deploy:web        # Cloudflare Workers deploy (see examples/web/README.md)
 ```
 
-ビルドは `tsc` を 2 回走らせるだけで、バンドラ依存はありません（`dist/esm` と `dist/cjs`、どちらも型定義つき）。
+The build runs standard `tsc` twice (ESM and CJS) with per-directory `package.json` files, without a bundler.
 
-## 参考
+## Documentation
 
-- 調査メモ（API 仕様・実測・設計判断・出典）: [docs/jev.md](docs/jev.md)
-- 導入手順（既存 Zod プロダクト向け、実例つき）: [docs/adoption.md](docs/adoption.md)
-- TypeSafe 公式: [typesafe.ai](https://typesafe.ai/) / [docs.typesafe.ai](https://docs.typesafe.ai/) / [API リファレンス](https://docs.typesafe.ai/api.md)
-- 公式 JavaScript SDK: [@typesafe-ai/sdk](https://www.npmjs.com/package/@typesafe-ai/sdk) / [typesafe-ai/typesafe-sdk-js](https://github.com/typesafe-ai/typesafe-sdk-js)
-- パターン集: [Speculative fan-out](https://docs.typesafe.ai/patterns/fan-out.md) / [Confidence-gated routing](https://docs.typesafe.ai/patterns/confidence-routing.md)
-- JEV は決定専用モデルです。流暢な文章は返しません。テキスト生成が必要な用途には LLM を使ってください。
+- [docs/jev.md](https://github.com/jomatsu/zod-jev/blob/main/docs/jev.md) — JEV/System One API
+  reference, measured behavior, design rationale, and sources (Japanese)
+- [docs/adoption.md](https://github.com/jomatsu/zod-jev/blob/main/docs/adoption.md) — Migration guide
+  for an existing Zod codebase, with a runnable example (Japanese)
+- [examples/web](https://github.com/jomatsu/zod-jev/tree/main/examples/web) — A demo app where a
+  marketplace listing form is judged in the background
+- TypeSafe: [typesafe.ai](https://typesafe.ai/), [docs.typesafe.ai](https://docs.typesafe.ai/)
+  (append `.md` to any docs URL for Markdown), [@typesafe-ai/sdk](https://www.npmjs.com/package/@typesafe-ai/sdk)
 
-## ライセンス
+## License
 
 MIT

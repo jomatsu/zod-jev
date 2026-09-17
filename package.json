@@ -40,6 +40,7 @@
   "files": [
     "dist",
     "README.md",
+    "README.ja.md",
     "LICENSE"
   ],
   "sideEffects": false,
@@ -55,8 +56,9 @@
     "demo:web:fake": "tsx examples/web/server.ts --fake",
     "dev:web": "wrangler dev --config examples/web/wrangler.jsonc --local --port 8788",
     "deploy:web": "wrangler deploy --config examples/web/wrangler.jsonc",
-    "check": "npm run typecheck && npm run test && npm run build && npm run check:dist",
-    "prepublishOnly": "npm run check"
+    "check": "npm run typecheck && npm run test && npm run build && npm run check:dist && npm run check:package",
+    "prepublishOnly": "npm run check",
+    "check:package": "node scripts/check-package.mjs"
   },
   "dependencies": {
     "@typesafe-ai/sdk": "^0.6.0"

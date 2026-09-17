@@ -57,7 +57,7 @@ export const ListingShape = Z.object({
   shippingFee: Z.enum(SHIPPING_FEES, "配送料の負担を選択してください"),
   shippingDays: Z.enum(SHIPPING_DAYS, "発送までの日数を選択してください"),
   price: Z.coerce
-    .number({ message: "価格は数字で入力してください" })
+    .number({ message: "価格は半角数字で入力してください" })
     .int("価格は整数で入力してください")
     .min(300, "価格は300円以上で入力してください")
     .max(9_999_999, "価格は9,999,999円以下で入力してください"),
@@ -83,21 +83,21 @@ export const ListingRules: readonly SemanticRule[] = [
   {
     id: "no_contact_or_external",
     is: "`value.body` に、電話番号・メールアドレス・SNS の ID・外部サイトの URL など、取引以外の連絡手段や外部への誘導が含まれていない",
-    message: "連絡先や外部サイトの記載はできません。お取引は取引メッセージでお願いします。",
+    message: "連絡先や外部サイトの記載はできません。お取引は取引メッセージをご利用ください。",
     path: ["body"],
     threshold: 0.9,
   },
   {
     id: "category_matches_item",
     is: "`value.category`（選択されたカテゴリー）が `value.title` と `value.body` の内容と一致している",
-    message: "カテゴリーが商品の内容と一致していません。選び直してください。",
+    message: "カテゴリーが商品の内容と一致していません。適切なカテゴリーを選択してください。",
     path: ["category"],
     threshold: 0.9,
   },
   {
     id: "condition_matches_description",
     is: "`value.condition`（選択された商品の状態）が `value.body` の記載と矛盾していない（傷、汚れ、使用期間、付属品の有無などを比べて）",
-    message: "商品の状態と説明の内容が一致していません。状態を選び直してください。",
+    message: "商品の状態と説明の内容が一致していません。適切な商品の状態を選択してください。",
     path: ["condition"],
     // 実測では、明確に一致していても 0.86 程度に落ち着くことがあった（説明に傷の言及があると下がる）。
     threshold: 0.85,
@@ -105,15 +105,15 @@ export const ListingRules: readonly SemanticRule[] = [
   {
     id: "price_is_plausible",
     is: "`value.price`（円）が、`value.title` と `value.body` の内容に対して極端に相場から外れていない（桁が違う、無料に近い、法外に高い）。`context.price_guide` の目安も参照する",
-    uncertainMessage: "価格が相場から外れているかどうかの判断がつきませんでした。",
-    message: "価格が商品の内容と合っていません。見直してください。",
+    uncertainMessage: "価格が相場に見合っているかどうかの確認ができませんでした。",
+    message: "価格が商品の内容と合っていません。設定価格をご確認ください。",
     path: ["price"],
     threshold: 0.9,
   },
   {
     id: "description_is_sufficient",
     is: "`value.body` に、購入を検討するために必要な情報（商品の状態、型番やサイズ、付属品、購入時期など）が書かれている",
-    uncertainMessage: "説明が十分かどうかの判断がつきませんでした。",
+    uncertainMessage: "商品の説明が十分かどうかの確認ができませんでした。",
     message: "商品の説明に、状態や付属品などの情報を追記してください。",
     path: ["body"],
     // 実測では、詳しい説明が 0.9 以上、短いだけの説明が 0.1 以下だった。

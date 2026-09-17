@@ -105,7 +105,7 @@ describe("出品画面の裏側（listing service）", () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.fieldErrors.category).toEqual([
-      "カテゴリーが商品の内容と一致していません。選び直してください。",
+      "カテゴリーが商品の内容と一致していません。適切なカテゴリーを選択してください。",
     ]);
     expect(result.fieldErrors.body).toBeUndefined();
   });
